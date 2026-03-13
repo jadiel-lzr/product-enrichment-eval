@@ -18,12 +18,13 @@ export function AccuracyScore({ score }: AccuracyScoreProps) {
     return null
   }
 
-  const colorClass = getScoreColor(score)
+  const displayScore = score * 10
+  const colorClass = getScoreColor(displayScore)
 
   return (
     <span className="inline-flex items-center gap-1" title="LLM accuracy score">
       <span className="text-xs text-gray-400">LLM Score</span>
-      <span className={`text-sm font-semibold ${colorClass}`}>{score}%</span>
+      <span className={`text-sm font-semibold ${colorClass}`}>{displayScore}%</span>
     </span>
   )
 }

@@ -137,7 +137,8 @@ function collectToolStats(
       if (typeof enrichment.accuracyScore === 'number' && enrichment.scoreTrack === 'confidence') {
         accumulator.confidenceScoreSum += enrichment.accuracyScore
         accumulator.confidenceScoreCount += 1
-        accumulator.weightedScoreSum += enrichment.accuracyScore * rowFillRate
+        const normalizedScore = enrichment.accuracyScore / 10
+        accumulator.weightedScoreSum += normalizedScore * rowFillRate
       } else {
         accumulator.weightedScoreSum += rowFillRate
       }
@@ -158,7 +159,7 @@ function buildRankingRow(
 
   const scoreTrack =
     accumulator.confidenceScoreCount === rowCount ? 'confidence' : 'no-confidence'
-  const completenessScore = accumulator.overallFilledCount / (productCount * CORE_ENRICHMENT_FIELDS.length)
+  const completenessScore = accumulator.overallFilledCount / (rowCount * CORE_ENRICHMENT_FIELDS.length)
   const weightedQualityScore =
     scoreTrack === 'confidence'
       ? accumulator.weightedScoreSum / rowCount
