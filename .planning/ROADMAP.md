@@ -55,7 +55,7 @@ Plans:
 - [ ] 02-04-PLAN.md — Batch runner, CLI entry point (--tool flag), and run summary reports
 
 ### Phase 3: Core Comparison UI
-**Goal**: The client can browse products, view side-by-side enrichment results from all tools, visually see what changed, filter the dataset, and rate each tool's quality per product
+**Goal**: The client can browse products, view side-by-side enrichment results from all tools, visually see what changed, filter the dataset, and see LLM-generated accuracy scores per product
 **Depends on**: Phase 1 (for types and schemas; can use mock CSVs until Phase 2 completes)
 **Requirements**: UI-01, UI-02, UI-03, UI-04, UI-05, UI-06, UI-07
 **Success Criteria** (what must be TRUE):
@@ -63,13 +63,13 @@ Plans:
   2. Selected product shows one card per enrichment tool side-by-side, each displaying the tool's enriched data for that product
   3. Enriched fields are visually distinguished from original data (color highlighting: green for enriched, gray for unchanged, amber for partially filled)
   4. Product images from feed URLs display on each card, and filtering by brand, category, department, and enrichment completeness narrows the product list
-  5. User can rate each tool's output quality (1-5 stars) per product, and those scores persist in localStorage across page refreshes
-**Plans**: TBD
+  5. LLM accuracy scores from enriched CSVs display per tool per product, with score data persisting via the CSV data source
+**Plans:** 3 plans
 
 Plans:
-- [ ] 03-01: TBD
-- [ ] 03-02: TBD
-- [ ] 03-03: TBD
+- [ ] 03-01-PLAN.md — React scaffolding, Tailwind, data loading layer, mock CSV generator, application state context (UI-07)
+- [ ] 03-02-PLAN.md — Product sidebar with virtual scroll, search, filters, collapse, URL routing (UI-01, UI-05)
+- [ ] 03-03-PLAN.md — Comparison cards, color-coded field diffs, images, LLM scores, responsive layout, visual checkpoint (UI-02, UI-03, UI-04, UI-06)
 
 ### Phase 4: Analysis and Reporting
 **Goal**: The client can see aggregate results, understand which tool wins overall and per-field, configure importance weights, and export everything for their team
@@ -115,10 +115,10 @@ Phase 5 is DETACHED and can execute independently after Phase 1, in parallel wit
 |-------|----------------|--------|-----------|
 | 1. Data Foundation | 3/3 | Complete | 2026-03-13 |
 | 2. Enrichment Engine | 0/4 | Planned | - |
-| 3. Core Comparison UI | 0/0 | Not started | - |
+| 3. Core Comparison UI | 0/3 | Planned | - |
 | 4. Analysis and Reporting | 0/0 | Not started | - |
 | 5. SerpAPI URL Discovery *(DETACHED)* | 0/0 | Not started | - |
 
 ---
 *Roadmap created: 2026-03-13*
-*Last updated: 2026-03-13 (Phase 2 planned)*
+*Last updated: 2026-03-13 (Phase 3 planned)*
