@@ -9,6 +9,7 @@ import {
 import type { EnrichmentAdapter, EnrichmentResult } from './types.js'
 import { computeFillRate } from './types.js'
 import { withRetry } from '../batch/retry.js'
+import { getLensScrapingUrls } from '../lens/extractor.js'
 
 const SEARCH_LIMIT = 3
 const ADAPTER_NAME = 'firecrawl'
@@ -370,6 +371,16 @@ export function createFirecrawlAdapter(
         const missingFields = getMissingFields(product)
         if (missingFields.length === 0) {
           return buildEnrichmentResult(product, {})
+        }
+
+        const lensUrls = getLensScrapingUrls(product)
+        if (lensUrls.length > 0) {
+          return await scrapeForMissingFields(
+            client,
+            lensUrls[0]!,
+            product,
+            missingFields,
+          )
         }
 
         const serpUrl = serpApiUrls[product.sku]?.[0]

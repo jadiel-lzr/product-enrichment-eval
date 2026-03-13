@@ -359,6 +359,107 @@ describe('FireCrawl Adapter', () => {
       )
     })
 
+    it('uses lens brand match URL as highest priority, skipping SerpAPI and search', async () => {
+      const lensData = JSON.stringify([
+        {
+          title: 'Gucci GG Marmont Bag',
+          link: 'https://www.farfetch.com/gucci-bag/123',
+          source: 'Farfetch',
+        },
+      ])
+      const productWithLens = {
+        ...BASE_PRODUCT,
+        sku: 'SKU-LENS',
+        lens_brand_matches: lensData,
+      } as Product
+
+      mockScrape.mockResolvedValue({
+        json: {
+          description_eng: 'Lens-sourced description.',
+          dimensions: '26 x 15 x 7 cm',
+          weight: '0.8 kg',
+          additional_info: 'From lens URL',
+        },
+      })
+
+      vi.mocked(existsSync).mockReturnValue(false)
+
+      const adapter = createFirecrawlAdapter('data/missing-serpapi.json')
+      const result = await adapter.enrich(productWithLens)
+
+      expect(mockSearch).not.toHaveBeenCalled()
+      expect(mockScrape).toHaveBeenCalledWith(
+        'https://www.farfetch.com/gucci-bag/123',
+        expect.any(Object),
+      )
+      expect(result.status).toBe('success')
+    })
+
+    it('falls through to search when lens matches are only stock photos', async () => {
+      const stockData = JSON.stringify([
+        {
+          title: 'Stock photo bag',
+          link: 'https://www.istockphoto.com/photo/bag-123',
+          source: 'iStock',
+        },
+      ])
+      const productWithStock = {
+        ...BASE_PRODUCT,
+        sku: 'SKU-STOCK-ONLY',
+        lens_brand_matches: stockData,
+      } as Product
+
+      mockSearch.mockResolvedValue({
+        web: [{ url: 'https://www.gucci.com/us/en/pr/handbags/item' }],
+      })
+      mockScrape.mockResolvedValue({
+        json: {
+          description_eng: 'From search.',
+          dimensions: '26 x 15 x 7 cm',
+          weight: '0.8 kg',
+          additional_info: 'Search result',
+        },
+      })
+
+      vi.mocked(existsSync).mockReturnValue(false)
+
+      const adapter = createFirecrawlAdapter('data/missing-serpapi.json')
+      const result = await adapter.enrich(productWithStock)
+
+      expect(mockSearch).toHaveBeenCalled()
+      expect(result.status).toBe('success')
+    })
+
+    it('falls through to search when lens data has error object', async () => {
+      const errorData = JSON.stringify({ error: 'Provided image link cannot be opened' })
+      const productWithError = {
+        ...BASE_PRODUCT,
+        sku: 'SKU-LENS-ERR',
+        lens_brand_matches: errorData,
+        lens_all_matches: errorData,
+      } as Product
+
+      mockSearch.mockResolvedValue({
+        web: [{ url: 'https://www.gucci.com/us/en/pr/handbags/item' }],
+      })
+      mockScrape.mockResolvedValue({
+        json: {
+          description_eng: 'From search.',
+          dimensions: '26 x 15 x 7 cm',
+          weight: '0.8 kg',
+          additional_info: 'Search result',
+        },
+      })
+
+      vi.mocked(existsSync).mockReturnValue(false)
+
+      const adapter = createFirecrawlAdapter('data/missing-serpapi.json')
+      const result = await adapter.enrich(productWithError)
+
+      expect(mockSearch).toHaveBeenCalled()
+      expect(result.status).toBe('success')
+    })
+
     it('gracefully handles missing SerpAPI URLs file and proceeds with search', async () => {
       vi.mocked(existsSync).mockReturnValue(false)
       vi.mocked(readFileSync).mockImplementation(() => {
