@@ -18,6 +18,7 @@ function getFilterValue(
 
 export function useUrlParams(): UrlParamState {
   const [searchParams, setSearchParams] = useSearchParams()
+  const searchParamsString = searchParams.toString()
 
   const urlSku = searchParams.get('product')
 
@@ -28,47 +29,57 @@ export function useUrlParams(): UrlParamState {
       category: getFilterValue(searchParams, 'category'),
       department: getFilterValue(searchParams, 'department'),
     }),
-    [searchParams],
+    [searchParamsString],
   )
 
   const setUrlSku = useCallback(
     (sku: string | null) => {
-      const nextParams = new URLSearchParams(searchParams)
+      setSearchParams(
+        (currentParams) => {
+          const nextParams = new URLSearchParams(currentParams)
 
-      if (sku) {
-        nextParams.set('product', sku)
-      } else {
-        nextParams.delete('product')
-      }
+          if (sku) {
+            nextParams.set('product', sku)
+          } else {
+            nextParams.delete('product')
+          }
 
-      if (nextParams.toString() === searchParams.toString()) {
-        return
-      }
+          if (nextParams.toString() === currentParams.toString()) {
+            return currentParams
+          }
 
-      setSearchParams(nextParams, { replace: false })
+          return nextParams
+        },
+        { replace: false },
+      )
     },
-    [searchParams, setSearchParams],
+    [setSearchParams],
   )
 
   const setUrlFilters = useCallback(
     (filters: FilterState) => {
-      const nextParams = new URLSearchParams(searchParams)
+      setSearchParams(
+        (currentParams) => {
+          const nextParams = new URLSearchParams(currentParams)
 
-      for (const [key, value] of Object.entries(filters)) {
-        if (value) {
-          nextParams.set(key, value)
-        } else {
-          nextParams.delete(key)
-        }
-      }
+          for (const [key, value] of Object.entries(filters)) {
+            if (value) {
+              nextParams.set(key, value)
+            } else {
+              nextParams.delete(key)
+            }
+          }
 
-      if (nextParams.toString() === searchParams.toString()) {
-        return
-      }
+          if (nextParams.toString() === currentParams.toString()) {
+            return currentParams
+          }
 
-      setSearchParams(nextParams, { replace: true })
+          return nextParams
+        },
+        { replace: true },
+      )
     },
-    [searchParams, setSearchParams],
+    [setSearchParams],
   )
 
   return {

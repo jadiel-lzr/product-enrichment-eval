@@ -5,6 +5,7 @@ import {
   useMemo,
   useCallback,
   useEffect,
+  useRef,
   type ReactNode,
 } from 'react'
 import { useProductData } from '@/hooks/useProductData'
@@ -75,16 +76,25 @@ interface ProductProviderProps {
 export function ProductProvider({ children }: ProductProviderProps) {
   const { products, enrichmentsByProduct, loading, error } = useProductData()
   const { urlSku, urlFilters, setUrlSku, setUrlFilters } = useUrlParams()
-  const [selectedSku, setSelectedSkuState] = useState<string | null>(urlSku)
-  const [filters, setFiltersState] = useState<FilterState>(urlFilters)
+  const [selectedSku, setSelectedSkuState] = useState<string | null>(
+    () => urlSku,
+  )
+  const [filters, setFiltersState] = useState<FilterState>(() => urlFilters)
+  const lastUrlSelectionRef = useRef<string | null>(urlSku)
+  const lastUrlFiltersRef = useRef<string>(JSON.stringify(urlFilters))
 
   const setSelectedSku = useCallback((sku: string) => {
     setSelectedSkuState(sku)
-  }, [])
+    lastUrlSelectionRef.current = sku
+    setUrlSku(sku)
+  }, [setUrlSku])
 
   const setFilters = useCallback((newFilters: FilterState) => {
     setFiltersState(newFilters)
-  }, [])
+    const serialized = JSON.stringify(newFilters)
+    lastUrlFiltersRef.current = serialized
+    setUrlFilters(newFilters)
+  }, [setUrlFilters])
 
   const sortedProducts = useMemo(() => sortProducts(products), [products])
 
@@ -124,27 +134,23 @@ export function ProductProvider({ children }: ProductProviderProps) {
   )
 
   useEffect(() => {
-    setFiltersState((current) => {
-      if (
-        current.search === urlFilters.search &&
-        current.brand === urlFilters.brand &&
-        current.category === urlFilters.category &&
-        current.department === urlFilters.department
-      ) {
-        return current
-      }
-
-      return urlFilters
-    })
-  }, [urlFilters])
-
-  useEffect(() => {
-    if (urlSku === selectedSku) {
+    if (urlSku === lastUrlSelectionRef.current) {
       return
     }
 
+    lastUrlSelectionRef.current = urlSku
     setSelectedSkuState(urlSku)
-  }, [urlSku, selectedSku])
+  }, [urlSku])
+
+  useEffect(() => {
+    const serializedFilters = JSON.stringify(urlFilters)
+    if (serializedFilters === lastUrlFiltersRef.current) {
+      return
+    }
+
+    lastUrlFiltersRef.current = serializedFilters
+    setFiltersState(urlFilters)
+  }, [urlFilters])
 
   useEffect(() => {
     if (loading) {
@@ -154,39 +160,24 @@ export function ProductProvider({ children }: ProductProviderProps) {
     if (filteredProducts.length === 0) {
       if (selectedSku !== null) {
         setSelectedSkuState(null)
+        lastUrlSelectionRef.current = null
+        setUrlSku(null)
       }
       return
     }
 
+    const nextSelectedSku = selectedSku ?? urlSku
     const isSelectedInFiltered =
-      selectedSku !== null &&
-      filteredProducts.some((p) => p.sku === selectedSku)
+      nextSelectedSku !== null &&
+      filteredProducts.some((p) => p.sku === nextSelectedSku)
 
     if (!isSelectedInFiltered) {
-      setSelectedSkuState(filteredProducts[0].sku)
+      const firstSku = filteredProducts[0].sku
+      setSelectedSkuState(firstSku)
+      lastUrlSelectionRef.current = firstSku
+      setUrlSku(firstSku)
     }
-  }, [filteredProducts, loading, selectedSku])
-
-  useEffect(() => {
-    if (selectedSku === urlSku) {
-      return
-    }
-
-    setUrlSku(selectedSku)
-  }, [selectedSku, setUrlSku, urlSku])
-
-  useEffect(() => {
-    if (
-      filters.search === urlFilters.search &&
-      filters.brand === urlFilters.brand &&
-      filters.category === urlFilters.category &&
-      filters.department === urlFilters.department
-    ) {
-      return
-    }
-
-    setUrlFilters(filters)
-  }, [filters, setUrlFilters, urlFilters])
+  }, [filteredProducts, loading, selectedSku, setUrlSku, urlSku])
 
   const value = useMemo<ProductContextValue>(
     () => ({
