@@ -28,11 +28,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. Cleaning removes test/placeholder products, normalizes colors, sanitizes titles, and trims whitespace -- producing a filtered dataset of only real products
   3. Image URL pre-flight check runs HEAD requests against all product image URLs, reporting which are reachable, and downloads reachable images to a local cache
   4. Shared TypeScript types and Zod schemas for `Product` and `EnrichedFields` are defined and importable by both enrichment scripts and frontend
-**Plans**: TBD
+**Plans:** 3 plans
 
 Plans:
-- [ ] 01-01: TBD
-- [ ] 01-02: TBD
+- [ ] 01-01-PLAN.md — Project scaffolding, Zod schemas, CSV reader/writer (PIPE-01)
+- [ ] 01-02-PLAN.md — Cleaning pipeline, filters, normalizers, base.csv output (PIPE-06)
+- [ ] 01-03-PLAN.md — Image preflight, download caching, manifest generation (PIPE-02)
 
 ### Phase 2: Enrichment Engine
 **Goal**: All 4 enrichment tools process the full product dataset through a resilient batch runner, producing one enriched CSV per tool with metadata tracking
@@ -91,7 +92,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Data Foundation | 0/0 | Not started | - |
+| 1. Data Foundation | 0/3 | Planned | - |
 | 2. Enrichment Engine | 0/0 | Not started | - |
 | 3. Core Comparison UI | 0/0 | Not started | - |
 | 4. Analysis and Reporting | 0/0 | Not started | - |
