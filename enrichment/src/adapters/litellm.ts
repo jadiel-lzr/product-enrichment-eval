@@ -18,7 +18,8 @@ function getFirstNonEmptyEnv(keys: readonly string[]): string {
 }
 
 export function resolveLiteLLMBaseUrl(tool: LiteLLMTool): string | undefined {
-  const value = process.env[`${tool.toUpperCase()}_BASE_URL`] ?? process.env.LITELLM_BASE_URL
+  const toolBaseUrl = process.env[`${tool.toUpperCase()}_BASE_URL`]
+  const value = toolBaseUrl && toolBaseUrl.trim() !== '' ? toolBaseUrl : process.env.LITELLM_BASE_URL
   if (!value || value.trim() === '') {
     return undefined
   }
