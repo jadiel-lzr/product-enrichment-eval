@@ -16,8 +16,8 @@
 
 ### Enrichment Adapters
 
-- [ ] **ENRC-01**: Claude adapter enriches products using Anthropic Messages API with vision (text + image)
-- [ ] **ENRC-02**: Gemini adapter enriches products using Google GenAI API with vision (text + image)
+- [x] **ENRC-01**: Claude adapter enriches products using Anthropic Messages API with vision (text + image)
+- [x] **ENRC-02**: Gemini adapter enriches products using Google GenAI API with vision (text + image)
 - [ ] **ENRC-03**: FireCrawl adapter enriches products by searching brand sites and Google Shopping, then parsing page content; optionally uses SerpAPI-discovered URLs when available
 - [ ] **ENRC-04**: Perplexity adapter enriches products using search-augmented LLM via OpenAI-compatible API
 - [x] **ENRC-05**: All adapters implement a shared interface and fill the same 6 target fields (description_eng, season, year, collection, gtin, dimensions)
@@ -79,8 +79,8 @@
 | PIPE-03 | Phase 2 | Pending |
 | PIPE-04 | Phase 2 | Complete |
 | PIPE-05 | Phase 2 | Complete |
-| ENRC-01 | Phase 2 | Pending |
-| ENRC-02 | Phase 2 | Pending |
+| ENRC-01 | Phase 2 | Complete |
+| ENRC-02 | Phase 2 | Complete |
 | ENRC-03 | Phase 2 | Pending |
 | ENRC-04 | Phase 2 | Pending |
 | ENRC-05 | Phase 2 | Complete |
