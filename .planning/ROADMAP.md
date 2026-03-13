@@ -46,12 +46,13 @@ Plans:
   3. Running the batch CLI against the full dataset produces one enriched CSV per tool, with each row containing original identifiers plus enriched fields plus enrichment metadata (status, fields enriched, errors)
   4. Killing the batch process mid-run and restarting it resumes from the last checkpoint without re-processing already-completed products or wasting API credits
   5. A run summary report is generated showing per-tool statistics (products processed, fields filled, errors encountered)
-**Plans**: TBD
+**Plans:** 4 plans
 
 Plans:
-- [ ] 02-01: TBD
-- [ ] 02-02: TBD
-- [ ] 02-03: TBD
+- [ ] 02-01-PLAN.md — Shared infrastructure: expanded schema, adapter interface, image resizer, prompt template, checkpoint, retry
+- [ ] 02-02-PLAN.md — LLM vision adapters: Claude (Anthropic) and Gemini (Google GenAI) with structured output
+- [ ] 02-03-PLAN.md — Non-LLM adapters: FireCrawl (search+scrape) and Perplexity (search-augmented LLM)
+- [ ] 02-04-PLAN.md — Batch runner, CLI entry point (--tool flag), and run summary reports
 
 ### Phase 3: Core Comparison UI
 **Goal**: The client can browse products, view side-by-side enrichment results from all tools, visually see what changed, filter the dataset, and rate each tool's quality per product
@@ -113,11 +114,11 @@ Phase 5 is DETACHED and can execute independently after Phase 1, in parallel wit
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Data Foundation | 3/3 | Complete | 2026-03-13 |
-| 2. Enrichment Engine | 0/0 | Not started | - |
+| 2. Enrichment Engine | 0/4 | Planned | - |
 | 3. Core Comparison UI | 0/0 | Not started | - |
 | 4. Analysis and Reporting | 0/0 | Not started | - |
 | 5. SerpAPI URL Discovery *(DETACHED)* | 0/0 | Not started | - |
 
 ---
 *Roadmap created: 2026-03-13*
-*Last updated: 2026-03-13 (Phase 1 complete)*
+*Last updated: 2026-03-13 (Phase 2 planned)*
