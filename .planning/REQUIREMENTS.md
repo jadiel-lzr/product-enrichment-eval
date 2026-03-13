@@ -9,7 +9,7 @@
 
 - [x] **PIPE-01**: System parses source CSV into typed product objects with validated fields
 - [x] **PIPE-06**: System cleans product data before enrichment (sanitize titles, normalize colors, filter test/placeholder products, parse embedded JSON fields, trim whitespace)
-- [ ] **PIPE-02**: System pre-validates image URLs and caches reachable images for LLM consumption
+- [x] **PIPE-02**: System pre-validates image URLs and caches reachable images for LLM consumption
 - [ ] **PIPE-03**: System runs each product through each enrichment adapter and outputs enriched CSV per tool
 - [ ] **PIPE-04**: System supports checkpoint/resume so batch runs survive crashes without losing progress or API credits
 - [ ] **PIPE-05**: System tracks enrichment metadata per product (fields enriched, status, errors)
@@ -75,7 +75,7 @@
 |-------------|-------|--------|
 | PIPE-01 | Phase 1 | Complete |
 | PIPE-06 | Phase 1 | Complete |
-| PIPE-02 | Phase 1 | Pending |
+| PIPE-02 | Phase 1 | Complete |
 | PIPE-03 | Phase 2 | Pending |
 | PIPE-04 | Phase 2 | Pending |
 | PIPE-05 | Phase 2 | Pending |

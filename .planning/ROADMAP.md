@@ -12,7 +12,7 @@ This project delivers a side-by-side comparison of 4 enrichment tools (Claude, G
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Data Foundation** - Parse, clean, and validate source CSV into typed products with image pre-flight
+- [x] **Phase 1: Data Foundation** - Parse, clean, and validate source CSV into typed products with image pre-flight
 - [ ] **Phase 2: Enrichment Engine** - Build all 4 adapters behind a shared interface, batch runner with checkpoint/resume, and produce enriched CSVs
 - [ ] **Phase 3: Core Comparison UI** - React app with product browsing, side-by-side cards, visual diff, filtering, per-product scoring, and image display
 - [ ] **Phase 4: Analysis and Reporting** - Aggregate dashboard, per-field winner analysis, weighted scores, completeness metrics, and CSV export
@@ -32,9 +32,9 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans:** 3 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Project scaffolding, Zod schemas, CSV reader/writer (PIPE-01)
-- [ ] 01-02-PLAN.md — Cleaning pipeline, filters, normalizers, base.csv output (PIPE-06)
-- [ ] 01-03-PLAN.md — Image preflight, download caching, manifest generation (PIPE-02)
+- [x] 01-01-PLAN.md — Project scaffolding, Zod schemas, CSV reader/writer (PIPE-01)
+- [x] 01-02-PLAN.md — Cleaning pipeline, filters, normalizers, base.csv output (PIPE-06)
+- [x] 01-03-PLAN.md — Image preflight, download caching, manifest generation (PIPE-02)
 
 ### Phase 2: Enrichment Engine
 **Goal**: All 4 enrichment tools process the full product dataset through a resilient batch runner, producing one enriched CSV per tool with metadata tracking
@@ -112,7 +112,7 @@ Phase 5 is DETACHED and can execute independently after Phase 1, in parallel wit
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Data Foundation | 0/3 | Planned | - |
+| 1. Data Foundation | 3/3 | Complete | 2026-03-13 |
 | 2. Enrichment Engine | 0/0 | Not started | - |
 | 3. Core Comparison UI | 0/0 | Not started | - |
 | 4. Analysis and Reporting | 0/0 | Not started | - |
@@ -120,4 +120,4 @@ Phase 5 is DETACHED and can execute independently after Phase 1, in parallel wit
 
 ---
 *Roadmap created: 2026-03-13*
-*Last updated: 2026-03-13*
+*Last updated: 2026-03-13 (Phase 1 complete)*
