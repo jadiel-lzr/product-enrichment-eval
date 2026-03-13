@@ -4,11 +4,11 @@ import type { EnrichmentAdapter } from '../types.js'
 
 // Mock @mendable/firecrawl-js
 const mockSearch = vi.fn()
-const mockScrapeUrl = vi.fn()
+const mockScrape = vi.fn()
 vi.mock('@mendable/firecrawl-js', () => {
   class MockFirecrawl {
     search = mockSearch
-    scrapeUrl = mockScrapeUrl
+    scrape = mockScrape
   }
   return { default: MockFirecrawl }
 })
@@ -122,7 +122,7 @@ describe('FireCrawl Adapter', () => {
 
   describe('enrich() with SerpAPI URLs', () => {
     it('uses SerpAPI URL directly when serpApiUrls map contains the product SKU', async () => {
-      mockScrapeUrl.mockResolvedValue({
+      mockScrape.mockResolvedValue({
         success: true,
         markdown: MOCK_MARKDOWN,
       })
@@ -130,9 +130,9 @@ describe('FireCrawl Adapter', () => {
       const adapter = createFirecrawlAdapter('data/serpapi-urls.json')
       const result = await adapter.enrich(MOCK_PRODUCT)
 
-      expect(mockScrapeUrl).toHaveBeenCalledWith(
+      expect(mockScrape).toHaveBeenCalledWith(
         'https://brand.com/product/sku-001',
-        { formats: ['markdown'] },
+        expect.objectContaining({ formats: ['markdown'] }),
       )
       expect(mockSearch).not.toHaveBeenCalled()
       expect(result.status).not.toBe('failed')
@@ -144,15 +144,14 @@ describe('FireCrawl Adapter', () => {
       const productWithoutSerpApi = { ...MOCK_PRODUCT, sku: 'SKU-NO-SERP' }
 
       mockSearch.mockResolvedValue({
-        success: true,
-        data: [{ markdown: MOCK_MARKDOWN, url: 'https://brand.com/product' }],
+        web: [{ markdown: MOCK_MARKDOWN, url: 'https://brand.com/product' }],
       })
 
       // Override existsSync to return false for serpapi
-      vi.mocked(existsSync).mockImplementation((path: string) => {
+      vi.mocked(existsSync).mockImplementation(((path: string) => {
         if (typeof path === 'string' && path.includes('serpapi-urls.json')) return false
         return false
-      })
+      }) as typeof existsSync)
 
       const adapter = createFirecrawlAdapter('data/serpapi-urls-nonexistent.json')
       const result = await adapter.enrich(productWithoutSerpApi)
@@ -168,10 +167,9 @@ describe('FireCrawl Adapter', () => {
       const productWithoutSerpApi = { ...MOCK_PRODUCT, sku: 'SKU-NO-SERP' }
 
       mockSearch
-        .mockResolvedValueOnce({ success: true, data: [] }) // first search: empty
+        .mockResolvedValueOnce({ web: [] }) // first search: empty
         .mockResolvedValueOnce({
-          success: true,
-          data: [{ markdown: MOCK_MARKDOWN, url: 'https://shopping.google.com/product' }],
+          web: [{ markdown: MOCK_MARKDOWN, url: 'https://shopping.google.com/product' }],
         })
 
       vi.mocked(existsSync).mockReturnValue(false)
@@ -190,8 +188,7 @@ describe('FireCrawl Adapter', () => {
   describe('markdown field extraction', () => {
     it('scrapes top search result as markdown and extracts enrichment fields', async () => {
       mockSearch.mockResolvedValue({
-        success: true,
-        data: [{ markdown: MOCK_MARKDOWN, url: 'https://brand.com/product' }],
+        web: [{ markdown: MOCK_MARKDOWN, url: 'https://brand.com/product' }],
       })
 
       vi.mocked(existsSync).mockReturnValue(false)
@@ -207,7 +204,7 @@ describe('FireCrawl Adapter', () => {
 
   describe('EnrichmentResult properties', () => {
     it('returns EnrichmentResult with correct fillRate and enrichedFields', async () => {
-      mockScrapeUrl.mockResolvedValue({
+      mockScrape.mockResolvedValue({
         success: true,
         markdown: MOCK_MARKDOWN,
       })
@@ -223,8 +220,8 @@ describe('FireCrawl Adapter', () => {
 
     it('returns status failed when both search and fallback return no results', async () => {
       mockSearch
-        .mockResolvedValueOnce({ success: true, data: [] })
-        .mockResolvedValueOnce({ success: true, data: [] })
+        .mockResolvedValueOnce({ web: [] })
+        .mockResolvedValueOnce({ web: [] })
 
       vi.mocked(existsSync).mockReturnValue(false)
 
@@ -237,7 +234,7 @@ describe('FireCrawl Adapter', () => {
     })
 
     it('does NOT include accuracyScore (non-LLM tool)', async () => {
-      mockScrapeUrl.mockResolvedValue({
+      mockScrape.mockResolvedValue({
         success: true,
         markdown: MOCK_MARKDOWN,
       })
@@ -251,7 +248,7 @@ describe('FireCrawl Adapter', () => {
 
   describe('retry behavior', () => {
     it('wraps API calls in withRetry', async () => {
-      mockScrapeUrl.mockResolvedValue({
+      mockScrape.mockResolvedValue({
         success: true,
         markdown: MOCK_MARKDOWN,
       })
@@ -273,8 +270,7 @@ describe('FireCrawl Adapter', () => {
       const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
       mockSearch.mockResolvedValue({
-        success: true,
-        data: [{ markdown: MOCK_MARKDOWN, url: 'https://brand.com/product' }],
+        web: [{ markdown: MOCK_MARKDOWN, url: 'https://brand.com/product' }],
       })
 
       const adapter = createFirecrawlAdapter('data/missing-file.json')

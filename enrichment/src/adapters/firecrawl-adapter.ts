@@ -215,7 +215,7 @@ export function createFirecrawlAdapter(
         if (serpUrls && serpUrls.length > 0) {
           const scrapeResult = await withRetry(
             () =>
-              client.scrapeUrl(serpUrls[0], { formats: ['markdown'] }),
+              client.scrape(serpUrls[0], { formats: ['markdown'] }),
             `firecrawl-scrape-serpapi:${product.sku}`,
           )
 
@@ -239,8 +239,8 @@ export function createFirecrawlAdapter(
           `firecrawl-search:${product.sku}`,
         )
 
-        const searchMarkdown = searchResult?.data
-          ? getMarkdownFromSearchResults(searchResult.data)
+        const searchMarkdown = searchResult?.web
+          ? getMarkdownFromSearchResults(searchResult.web as ReadonlyArray<{ markdown?: string; url?: string }>)
           : undefined
 
         if (searchMarkdown) {
@@ -259,8 +259,8 @@ export function createFirecrawlAdapter(
           `firecrawl-search-fallback:${product.sku}`,
         )
 
-        const fallbackMarkdown = fallbackResult?.data
-          ? getMarkdownFromSearchResults(fallbackResult.data)
+        const fallbackMarkdown = fallbackResult?.web
+          ? getMarkdownFromSearchResults(fallbackResult.web as ReadonlyArray<{ markdown?: string; url?: string }>)
           : undefined
 
         if (fallbackMarkdown) {
