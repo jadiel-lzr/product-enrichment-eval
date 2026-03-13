@@ -17,6 +17,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
+    "@mendable/firecrawl-js": "^4.16.0",
     "p-limit": "^7.3.0",
     "papaparse": "^5.5.3",
     "sharp": "^0.34.5",
