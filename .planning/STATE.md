@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: in-progress
-stopped_at: Completed 02-01-PLAN.md (shared infrastructure)
-last_updated: "2026-03-13T17:58:23Z"
-last_activity: 2026-03-13 -- Completed plan 02-01 (shared infrastructure)
+stopped_at: Completed 03-01-PLAN.md (frontend scaffolding)
+last_updated: "2026-03-13T18:07:02Z"
+last_activity: 2026-03-13 -- Completed plan 03-01 (frontend scaffolding, data loading, context)
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 10
-  completed_plans: 4
-  percent: 40
+  completed_plans: 5
+  percent: 50
 ---
 
 # Project State
@@ -21,23 +21,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-13)
 
 **Core value:** The client can visually compare enrichment quality across tools and make an informed decision on which approach to adopt.
-**Current focus:** Phase 2: Enrichment Engine
+**Current focus:** Phase 3: Core Comparison UI
 
 ## Current Position
 
-Phase: 2 of 5 (Enrichment Engine)
-Plan: 1 of 4 in current phase
+Phase: 3 of 5 (Core Comparison UI)
+Plan: 1 of 3 in current phase
 Status: In Progress
-Last activity: 2026-03-13 -- Completed plan 02-01 (shared infrastructure)
+Last activity: 2026-03-13 -- Completed plan 03-01 (frontend scaffolding, data loading, context)
 
-Progress: [████------] 40%
+Progress: [█████-----] 50%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4
-- Average duration: 7.3 min
-- Total execution time: 0.48 hours
+- Total plans completed: 5
+- Average duration: 7.6 min
+- Total execution time: 0.63 hours
 
 **By Phase:**
 
@@ -45,13 +45,14 @@ Progress: [████------] 40%
 |-------|-------|-------|----------|
 | 01-data-foundation | 3 | 23 min | 7.7 min |
 | 02-enrichment-engine | 1 | 6 min | 6.0 min |
+| 03-core-comparison-ui | 1 | 9 min | 9.0 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (7min), 01-02 (8min), 01-03 (8min), 02-01 (6min)
+- Last 5 plans: 01-02 (8min), 01-03 (8min), 02-01 (6min), 03-01 (9min)
 - Trend: Stable
 
 *Updated after each plan completion*
-| Phase 02 P01 | 6 | 2 tasks | 14 files |
+| Phase 03 P01 | 9 | 2 tasks | 21 files |
 
 ## Accumulated Context
 
@@ -76,6 +77,10 @@ Recent decisions affecting current work:
 - 02-01: Changed EnrichedFieldsSchema from .strict() to .passthrough() for hybrid LLM discovery
 - 02-01: Image resizer returns Buffer (not base64) -- adapters encode per API format
 - 02-01: Retry tests use real timers (Vitest 4 fake timer compatibility issue)
+- 03-01: Used Tailwind v4 with @tailwindcss/vite plugin (CSS-based config via @theme directives, no tailwind.config)
+- 03-01: Updated CORE_ENRICHMENT_FIELDS to 9 fields matching actual enriched.ts (added made_in, materials, weight)
+- 03-01: Installed zod in frontend for @shared/ path alias to resolve enrichment schema types during build
+- 03-01: Used --legacy-peer-deps for @tailwindcss/vite due to Vite 8 peer dep mismatch
 
 ### Pending Todos
 
@@ -89,6 +94,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-13T17:58:23Z
-Stopped at: Completed 02-01-PLAN.md (shared infrastructure)
-Resume file: .planning/phases/02-enrichment-engine/02-02-PLAN.md
+Last session: 2026-03-13T18:07:02Z
+Stopped at: Completed 03-01-PLAN.md (frontend scaffolding)
+Resume file: .planning/phases/03-core-comparison-ui/03-02-PLAN.md
