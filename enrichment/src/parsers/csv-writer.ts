@@ -1,11 +1,10 @@
 import Papa from 'papaparse'
 import { writeFileSync, mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
-import { type Product } from '../types/product.js'
 import { JSON_COLUMNS } from './json-columns.js'
 
 export function writeProductCSV(
-  products: readonly Product[],
+  products: readonly Record<string, unknown>[],
   filePath: string,
 ): void {
   const serialized = products.map((product) => {

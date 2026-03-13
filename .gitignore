@@ -7,3 +7,5 @@ dist/
 data/images/
 data/image-manifest.json
 data/enriched-*.csv
+data/checkpoints/
+data/reports/

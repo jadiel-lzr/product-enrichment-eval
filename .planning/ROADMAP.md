@@ -13,8 +13,8 @@ This project delivers a side-by-side comparison of 4 enrichment tools (Claude, G
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Data Foundation** - Parse, clean, and validate source CSV into typed products with image pre-flight
-- [ ] **Phase 2: Enrichment Engine** - Build all 4 adapters behind a shared interface, batch runner with checkpoint/resume, and produce enriched CSVs
-- [ ] **Phase 3: Core Comparison UI** - React app with product browsing, side-by-side cards, visual diff, filtering, per-product scoring, and image display
+- [x] **Phase 2: Enrichment Engine** - Build all 4 adapters behind a shared interface, batch runner with checkpoint/resume, and produce enriched CSVs
+- [x] **Phase 3: Core Comparison UI** - React app with product browsing, side-by-side cards, visual diff, filtering, per-product scoring, and image display
 - [ ] **Phase 4: Analysis and Reporting** - Aggregate dashboard, per-field winner analysis, weighted scores, completeness metrics, and CSV export
 - [ ] **Phase 5: SerpAPI URL Discovery** *(DETACHED)* - Visual product search via SerpAPI Google Lens to find accurate product page URLs; feeds into scraping tools for better extraction accuracy
 
@@ -49,10 +49,10 @@ Plans:
 **Plans:** 4 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — Shared infrastructure: expanded schema, adapter interface, image resizer, prompt template, checkpoint, retry
-- [ ] 02-02-PLAN.md — LLM vision adapters: Claude (Anthropic) and Gemini (Google GenAI) with structured output
-- [ ] 02-03-PLAN.md — Non-LLM adapters: FireCrawl (search+scrape) and Perplexity (search-augmented LLM)
-- [ ] 02-04-PLAN.md — Batch runner, CLI entry point (--tool flag), and run summary reports
+- [x] 02-01-PLAN.md — Shared infrastructure: expanded schema, adapter interface, image resizer, prompt template, checkpoint, retry
+- [x] 02-02-PLAN.md — LLM vision adapters: Claude (Anthropic) and Gemini (Google GenAI) with structured output
+- [x] 02-03-PLAN.md — Non-LLM adapters: FireCrawl (search+scrape) and Perplexity (search-augmented LLM)
+- [x] 02-04-PLAN.md — Batch runner, CLI entry point (--tool flag), and run summary reports
 
 ### Phase 3: Core Comparison UI
 **Goal**: The client can browse products, view side-by-side enrichment results from all tools, visually see what changed, filter the dataset, and see LLM-generated accuracy scores per product
@@ -68,8 +68,8 @@ Plans:
 
 Plans:
 - [x] 03-01-PLAN.md — React scaffolding, Tailwind, data loading layer, mock CSV generator, application state context (UI-07)
-- [ ] 03-02-PLAN.md — Product sidebar with virtual scroll, search, filters, collapse, URL routing (UI-01, UI-05)
-- [ ] 03-03-PLAN.md — Comparison cards, color-coded field diffs, images, LLM scores, responsive layout, visual checkpoint (UI-02, UI-03, UI-04, UI-06)
+- [x] 03-02-PLAN.md — Product sidebar with virtual scroll, search, filters, collapse, URL routing (UI-01, UI-05)
+- [x] 03-03-PLAN.md — Comparison cards, color-coded field diffs, images, LLM scores, responsive layout, visual checkpoint (UI-02, UI-03, UI-04, UI-06)
 
 ### Phase 4: Analysis and Reporting
 **Goal**: The client can see aggregate results, understand which tool wins overall and per-field, configure importance weights, and export everything for their team
@@ -114,11 +114,11 @@ Phase 5 is DETACHED and can execute independently after Phase 1, in parallel wit
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Data Foundation | 3/3 | Complete | 2026-03-13 |
-| 2. Enrichment Engine | 0/4 | Planned | - |
-| 3. Core Comparison UI | 1/3 | In Progress | - |
+| 2. Enrichment Engine | 4/4 | Complete | 2026-03-13 |
+| 3. Core Comparison UI | 3/3 | Complete | 2026-03-13 |
 | 4. Analysis and Reporting | 0/0 | Not started | - |
 | 5. SerpAPI URL Discovery *(DETACHED)* | 0/0 | Not started | - |
 
 ---
 *Roadmap created: 2026-03-13*
-*Last updated: 2026-03-13 (Phase 3, Plan 01 complete)*
+*Last updated: 2026-03-13 (Phase 3 complete)*
