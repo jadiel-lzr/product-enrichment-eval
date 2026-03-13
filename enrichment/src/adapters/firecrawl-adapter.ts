@@ -112,7 +112,7 @@ function getExistingTargetValue(
         (product.color_original.trim() || undefined)
       )
     case 'additional_info':
-      return undefined
+      return getExistingString(product, 'additional_info')
   }
 }
 
