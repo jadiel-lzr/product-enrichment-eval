@@ -22,8 +22,11 @@ product-enrichment-eval/
 |   |   |   |-- firecrawl.ts
 |   |   |   |-- perplexity.ts
 |   |   |   |-- apify.ts        # stretch
-|   |   |   |-- zyte.ts         # stretch
-|   |   |   `-- describely.ts   # stretch
+|   |   |   `-- zyte.ts         # stretch
+|   |   |-- url-discovery/      # SerpAPI Google Lens URL discovery (DETACHED)
+|   |   |   |-- serpapi-lens.ts # Visual search via SerpAPI Google Lens
+|   |   |   |-- url-manifest.ts # Read/write URL manifest (data/serpapi-urls.json)
+|   |   |   `-- run-discovery.ts# CLI entry point for URL discovery
 |   |   |-- csv/                # CSV read/write utilities
 |   |   |   |-- reader.ts       # Parse base CSV with PapaParse
 |   |   |   `-- writer.ts       # Write enriched CSV output
@@ -74,6 +77,7 @@ product-enrichment-eval/
 |   |-- enriched-gemini.csv
 |   |-- enriched-firecrawl.csv
 |   |-- enriched-perplexity.csv
+|   |-- serpapi-urls.json        # SerpAPI URL discovery manifest (SKU -> URLs)
 |   `-- checkpoints/            # Progress files per tool
 |
 `-- originalUnEnrichedProductFeed.csv
@@ -102,7 +106,8 @@ product-enrichment-eval/
 | **enrichment/run.ts** | CLI interface, parse args, invoke runner | Entry point; calls runner |
 | **frontend/hooks** | Load CSVs, manage filter/scoring state | Called by React components |
 | **frontend/components** | Render comparison UI | Use hooks; read from localStorage |
-| **data/** | CSV file storage (output of enrichment, input to frontend) | Written by enrichment, read by frontend |
+| **enrichment/url-discovery** | SerpAPI Google Lens visual search for product page URLs | Reads cached images from data/images/; writes data/serpapi-urls.json |
+| **data/** | CSV file storage + URL manifest (output of enrichment, input to frontend) | Written by enrichment + url-discovery, read by frontend |
 
 ### Critical Boundary: CSV as the Data Contract
 
@@ -115,6 +120,30 @@ The enrichment pipeline and the frontend never communicate directly. The CSV fil
 ---
 
 ## Data Flow
+
+### SerpAPI URL Discovery (DETACHED Write Path)
+
+```
+data/images/{sku}_{index}.{ext}  (from Phase 1 image pre-flight)
+        |
+        v
+  [SerpAPI Lens] -- For each product with cached images:
+        |
+        |--- Check checkpoint: already discovered? Skip.
+        |
+        |--- Send image to SerpAPI Google Lens endpoint
+        |       |
+        |       v
+        |   SerpAPI returns: visual_matches[], product_results[]
+        |       |
+        |       v
+        |   Rank and select best product page URLs
+        |
+        |--- Save to URL manifest + checkpoint
+        |
+        v
+  data/serpapi-urls.json  -- { [sku]: { urls: [...], confidence: ..., resultCount: ... } }
+```
 
 ### Enrichment Pipeline (Write Path)
 
@@ -129,13 +158,16 @@ originalUnEnrichedProductFeed.csv
         |
         |--- Check checkpoint: already processed? Skip.
         |
+        |--- [URL Manifest Lookup] -- OPTIONAL: check data/serpapi-urls.json
+        |       for discovered product page URLs (only for scraping adapters)
+        |
         |--- [Image Fetcher] -- Download first image URL, return base64
         |       (only for LLM adapters: Claude, Gemini)
         |
         |--- [Prompt Builder] -- Build enrichment prompt from product fields
         |       (only for LLM/search adapters)
         |
-        |--- [Adapter.enrich(product)] -- Call external API
+        |--- [Adapter.enrich(product, discoveredUrl?)] -- Call external API
         |       |
         |       v
         |   External API (Claude/Gemini/FireCrawl/Perplexity/etc.)
@@ -233,11 +265,14 @@ interface EnrichmentResult {
 // enrichment/adapters/types.ts
 interface EnrichmentAdapter {
   readonly name: string
-  enrich(product: Product): Promise<EnrichmentResult>
+  enrich(product: Product, discoveredUrl?: string): Promise<EnrichmentResult>
+  // discoveredUrl is OPTIONAL — from SerpAPI URL discovery manifest
+  // Adapters work with or without it. Scraping adapters (FireCrawl) use it
+  // to target the actual product page instead of searching by text.
 }
 ```
 
-**Why:** Adding a new tool (e.g., Describely) means creating one file that implements this interface. No changes to the runner, CSV writer, or any other component. The runner iterates over adapters polymorphically.
+**Why:** Adding a new tool means creating one file that implements this interface. No changes to the runner, CSV writer, or any other component. The runner iterates over adapters polymorphically. The optional `discoveredUrl` parameter allows scraping adapters to benefit from SerpAPI URL discovery without any coupling — adapters that don't use it simply ignore it.
 
 ### Pattern 2: Checkpoint/Resume for Batch Processing
 
@@ -466,10 +501,15 @@ Phase 5: Frontend (depends on Phase 4 CSVs, but can start with mocks in Phase 2)
   Can use mock CSVs during Phase 2-4, swap real data in Phase 5
       |
       v
+Phase 5 (DETACHED): SerpAPI URL Discovery (independent, parallel with 2-4)
+  enrichment/url-discovery/serpapi-lens.ts
+  enrichment/url-discovery/url-manifest.ts
+  enrichment/url-discovery/run-discovery.ts
+  Output: data/serpapi-urls.json (optional input for scraping adapters)
+
 Phase 6: Stretch Adapters + Polish (independent)
   enrichment/adapters/apify.ts
   enrichment/adapters/zyte.ts
-  enrichment/adapters/describely.ts
   frontend/AggregateReport.tsx
 ```
 
@@ -482,7 +522,8 @@ Phase 6: Stretch Adapters + Polish (independent)
 3. **Adapters can be parallel** because they are independent implementations of the same interface. One developer can build Claude while another builds FireCrawl.
 4. **CLI runner after adapters** because it orchestrates them. But the batch/checkpoint logic can be built earlier with a mock adapter.
 5. **Frontend can overlap** because it depends only on CSV format, not on enrichment code. Start with mock data.
-6. **Stretch adapters last** because they are lower priority and the architecture already supports adding new adapters trivially.
+6. **SerpAPI URL Discovery is detached** because it is an independent module that only needs cached images from Phase 1. It produces an optional URL manifest consumed by scraping adapters. Can be built by a separate developer in parallel with Phases 2-4.
+7. **Stretch adapters last** because they are lower priority and the architecture already supports adding new adapters trivially.
 
 ---
 

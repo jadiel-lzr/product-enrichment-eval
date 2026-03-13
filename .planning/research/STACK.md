@@ -28,6 +28,7 @@
 | @mendable/firecrawl-js | ^4.15.0 | FireCrawl (Web Scraping) | Official SDK. Supports /v2/search and /v1/scrape endpoints needed for the existing enrichment strategy. | HIGH |
 | openai | ^6.27.0 | Perplexity API (Search LLM) | Perplexity is OpenAI-compatible. Use the OpenAI SDK with `baseURL: "https://api.perplexity.ai"`. No need for a separate Perplexity package. | HIGH |
 | apify-client | ^2.22.0 | Apify (Web Scraping) [stretch] | Official Apify client. Auto-retries, works in Node.js. Use pre-built e-commerce Actors via their REST API. | MEDIUM |
+| serpapi | ^2.1.0 | SerpAPI Google Lens (URL Discovery) | Official SerpAPI client. Google Lens endpoint for visual product search. Returns product page URLs from image input. Used as a detached pre-enrichment step. | HIGH |
 
 #### Model IDs to Use
 
@@ -37,10 +38,6 @@
 | Google | `gemini-2.5-flash` | Fastest, cheapest multimodal in 2.5 family. Vision-capable. Budget-friendly for 500 products. |
 | Perplexity | `sonar-pro` | Search-augmented LLM. Best for finding real product data on the web. |
 | FireCrawl | N/A (API endpoints) | `/v2/search` for discovery, `/v1/scrape` for extraction. |
-
-#### Important: Describely Has No API
-
-Describely is a SaaS product with no public API. It only supports CSV upload and store integrations. For this evaluation, the Describely "adapter" would need to be a manual CSV upload/download workflow, not an automated script. Consider demoting to out-of-scope or documenting as a manual comparison.
 
 #### Important: Zyte Has No TypeScript SDK
 
@@ -192,6 +189,9 @@ cd enrichment
 # Core
 npm install @anthropic-ai/sdk @google/genai @mendable/firecrawl-js openai
 
+# URL discovery (SerpAPI Google Lens)
+npm install serpapi
+
 # Stretch tool clients
 npm install apify-client
 
@@ -267,6 +267,7 @@ ANTHROPIC_API_KEY=sk-ant-...
 GOOGLE_AI_API_KEY=AI...
 FIRECRAWL_API_KEY=fc-...
 PERPLEXITY_API_KEY=pplx-...
+SERPAPI_API_KEY=...                   # URL discovery (Google Lens)
 APIFY_API_TOKEN=apify_api_...       # stretch
 ZYTE_API_KEY=...                     # stretch
 ```
@@ -281,6 +282,7 @@ const envSchema = z.object({
   GOOGLE_AI_API_KEY: z.string().min(1),
   FIRECRAWL_API_KEY: z.string().min(1),
   PERPLEXITY_API_KEY: z.string().min(1),
+  SERPAPI_API_KEY: z.string().optional(),  // Optional: only for URL discovery
   APIFY_API_TOKEN: z.string().optional(),
   ZYTE_API_KEY: z.string().optional(),
 })
@@ -331,7 +333,6 @@ export const env = envSchema.parse(process.env)
 - [tsx on npm](https://www.npmjs.com/package/tsx) - v4.21.0
 - [Zod v4](https://zod.dev/v4) - v4.3.6
 - [dotenv on npm](https://www.npmjs.com/package/dotenv) - v17.3.1
-- [Describely Features](https://describely.ai/features/product-data-enrichment/) - No public API, SaaS-only
 - [Zyte API Reference](https://docs.zyte.com/zyte-api/usage/reference.html) - REST-only, no TS SDK
 - [Claude Vision API](https://platform.claude.com/docs/en/build-with-claude/vision) - Base64 image support
 - [Gemini Image Understanding](https://ai.google.dev/gemini-api/docs/image-understanding) - Base64 inline data

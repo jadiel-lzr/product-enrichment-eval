@@ -17,17 +17,18 @@ The critical risks are: (1) LLM hallucination that looks like valid enrichment �
 
 ### Recommended Stack
 
-The stack separates cleanly into two independent packages with no runtime sharing. The enrichment CLI uses Node.js 22 LTS with TypeScript 5.9 executed via `tsx` (esbuild-based, zero-config). Each enrichment tool gets its native SDK: `@anthropic-ai/sdk`, `@google/genai` (the new GA SDK — not the deprecated `@google/generative-ai`), and the `openai` SDK pointed at Perplexity's OpenAI-compatible endpoint. Concurrency is controlled by `p-limit` v7, CSV handling by `papaparse`, and runtime validation at every API boundary by `zod` v4 (14x faster than v3). The frontend uses React 19, Vite 7, and Tailwind CSS v4 — all stable releases. A component library was explicitly rejected because custom comparison card layouts would fight standard component styling.
+The stack separates cleanly into two independent packages with no runtime sharing, plus a detached SerpAPI URL discovery module. The enrichment CLI uses Node.js 22 LTS with TypeScript 5.9 executed via `tsx` (esbuild-based, zero-config). Each enrichment tool gets its native SDK: `@anthropic-ai/sdk`, `@google/genai` (the new GA SDK — not the deprecated `@google/generative-ai`), and the `openai` SDK pointed at Perplexity's OpenAI-compatible endpoint. SerpAPI (Google Lens) is used as a pre-enrichment URL discovery layer — it takes product images and finds the most accurate product page URLs via visual search, which scraping tools (FireCrawl) can then use directly instead of text-based search. Concurrency is controlled by `p-limit` v7, CSV handling by `papaparse`, and runtime validation at every API boundary by `zod` v4 (14x faster than v3). The frontend uses React 19, Vite 7, and Tailwind CSS v4 — all stable releases. A component library was explicitly rejected because custom comparison card layouts would fight standard component styling.
 
 **Core technologies:**
 - `tsx` v4.21 + TypeScript 5.9: script execution — fastest TS runner, no tsconfig needed, better ESM support than ts-node
 - `@anthropic-ai/sdk` v0.78 / `@google/genai` v1.44 / `openai` v6.27: provider SDKs — native access to provider-specific features (vision, grounding, citations) rather than unified SDK abstraction
+- `serpapi` (SerpAPI Google Lens): URL discovery — visual product search via Google Lens endpoint to find accurate product page URLs; feeds discovered URLs into scraping tools (FireCrawl) for higher-quality extraction
 - `papaparse` v5.5: CSV parsing — works in both Node.js and browser, handles quoted/escaped fields; single library for both environments
 - `p-limit` v7: concurrency — limits concurrent API calls per tool (2-5); ESM-only, requires `"type": "module"`
 - `zod` v4.3: validation — validates API response shapes, CSV row structures, and env vars at startup
 - React 19 + Vite 7 + Tailwind 4: frontend — React is a project constraint; Vite 7 chosen over 8 (released day of research); Tailwind v4 needs no PostCSS setup
 - `zustand` v5: state management — lightweight store for scoring state, filter state, and selected product; localStorage middleware for persistence
-- Describely has no public API; it must be treated as a manual CSV workflow, not an automated adapter
+- SerpAPI (`serpapi` npm package): Google Lens visual search — finds accurate product page URLs from product images; output is optional input for scraping adapters
 
 ### Expected Features
 
@@ -145,9 +146,9 @@ Based on the combined research, a 6-phase structure is recommended. Phases 1-4 c
 
 ### Phase 6: Stretch Adapters and Final Polish
 
-**Rationale:** Stretch adapters (Apify, Zyte, Describely-as-manual) can be added after the core evaluation is complete if time allows. Describely is a manual CSV workflow, not automated. Polish includes stratified analysis by brand/category popularity.
+**Rationale:** Stretch adapters (Apify, Zyte) can be added after the core evaluation is complete if time allows. Polish includes stratified analysis by brand/category popularity.
 
-**Delivers:** Apify and/or Zyte adapters (both optional), Describely manual comparison documentation, category/brand performance heatmap (if enough rated data exists), final presentation-ready report.
+**Delivers:** Apify and/or Zyte adapters (both optional), category/brand performance heatmap (if enough rated data exists), final presentation-ready report.
 
 **Addresses:** P3 features from FEATURES.md; Pitfall 9 (description quality varies by category) via stratified reporting
 
@@ -160,18 +161,19 @@ Based on the combined research, a 6-phase structure is recommended. Phases 1-4 c
 - Runner before full runs because checkpointing must protect every API dollar spent. The first real run cannot be a gamble.
 - Frontend can overlap from Phase 2 onward using mock CSVs — the CSV format is the contract, not the enrichment code.
 - Stretch adapters last because the architecture trivially supports new adapters; their addition is a single file per tool.
+- SerpAPI URL Discovery (Phase 5) is completely detached — depends only on Phase 1 images, can be built by a separate developer in parallel with all other phases. Its output (discovered URLs) is **optional** for other tools: scraping adapters work with or without SerpAPI URLs, but produce better results when URLs are available.
 
 ### Research Flags
 
 Phases needing deeper research during planning:
 - **Phase 2 (Perplexity adapter):** Documented structured output reliability issues require implementation experimentation. Schema warm-up behavior needs validation against actual API.
+- **Phase 5 (SerpAPI Google Lens):** SerpAPI's Google Lens endpoint needs validation for fashion product images. Need to test: result quality for luxury items, rate limits, pricing per search, and how well visual matches correlate with correct product pages. The endpoint returns visual_matches and product results — need to determine the best ranking strategy.
 - **Phase 6 (Apify actors):** Pre-built e-commerce scraping actors vary in quality and maintenance. Need to identify the best actor for fashion/luxury product data before committing to the adapter.
 
 Phases with standard patterns (skip research-phase):
 - **Phase 1:** PapaParse and Zod are mature with excellent docs. CSV parsing patterns are well-established.
 - **Phase 3:** Checkpoint/idempotent pipeline patterns are extensively documented across data engineering resources.
 - **Phase 4:** React 19 + Vite 7 + Tailwind v4 are all GA with strong documentation. localStorage patterns are trivial.
-- **Phase 5:** Low-complexity additions to existing UI. No new patterns introduced.
 
 ## Confidence Assessment
 
@@ -186,7 +188,7 @@ Phases with standard patterns (skip research-phase):
 
 ### Gaps to Address
 
-- **Describely integration scope:** Describely has no public API (confirmed). The roadmap should explicitly document it as a manual CSV upload workflow and not allocate sprint time for an adapter. Clarify with client whether they want Describely in scope at all.
+- **SerpAPI Google Lens result quality:** Visual search accuracy for fashion/luxury product images needs empirical validation. Some products may not have distinctive enough images for reliable visual matching (e.g., plain t-shirts). Test on a 20-product sample before full run.
 - **Actual product count after deduplication:** The source feed claims ~500 products but contains test/placeholder records ("Prodotto Test", "Brand di prova"). Actual enrichable product count needs to be determined in Phase 1 before estimating API costs and run times.
 - **Image URL health is unknown:** The proportion of working vs broken image URLs in the feed is unknown until the Phase 1 pre-flight check runs. If >30% of images are broken, the LLM quality comparison will be significantly degraded and evaluation methodology may need adjustment.
 - **Perplexity structured output stability:** The documented schema warm-up latency (10-30 seconds per new schema) and `sonar-reasoning-pro` parsing issues need empirical validation in Phase 2 before committing the approach for 500 products.
@@ -219,7 +221,7 @@ Phases with standard patterns (skip research-phase):
 - [Airbyte: Idempotency in Data Pipelines](https://airbyte.com/data-engineering-resources/idempotency-in-data-pipelines) — checkpoint/resume patterns
 
 ### Tertiary (LOW confidence / needs validation)
-- [Describely Features](https://describely.ai/features/product-data-enrichment/) — no public API confirmed; SaaS CSV-only workflow
+- [SerpAPI Google Lens](https://serpapi.com/google-lens-api) — visual product search endpoint for URL discovery
 - [Zyte API Reference](https://docs.zyte.com/zyte-api/usage/reference.html) — REST-only, use native fetch
 
 ---

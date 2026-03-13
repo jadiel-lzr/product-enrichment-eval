@@ -201,6 +201,24 @@ Mistakes that cause rewrites, wasted budget, or fundamentally invalid evaluation
 
 ---
 
+### Pitfall 9.5: SerpAPI Google Lens Returns Wrong Product Matches
+
+**What goes wrong:** Google Lens visual search may return visually similar but incorrect products. A green Prada bag might match to a different green Prada bag from a different season, or a completely different brand's bag that looks similar. The discovered URL then leads to the wrong product page, and scraping tools extract incorrect data with high confidence (because the data IS real — just for the wrong product).
+
+**Why it happens:** Visual search matches on visual similarity, not product identity. Products from the same brand/category often look very similar. Generic product images (plain t-shirts, basic accessories) may match many different products.
+
+**Prevention:**
+- Cross-validate SerpAPI results: check that the brand name in the visual match result matches the product's known brand
+- Store confidence/relevance scores from SerpAPI and only use high-confidence matches
+- For low-confidence matches, fall back to text-based search (FireCrawl's default behavior)
+- Test on a 20-product sample across different categories before full run
+
+**Detection:** If FireCrawl with SerpAPI URLs produces data that contradicts known product attributes (wrong brand, wrong category), the URL match was incorrect.
+
+**Phase:** Address in Phase 5 (SerpAPI URL Discovery).
+
+---
+
 ## Minor Pitfalls
 
 ---
@@ -266,6 +284,7 @@ Mistakes that cause rewrites, wasted budget, or fundamentally invalid evaluation
 | Phase 4: UI | Unfair tool comparison (Pitfall 2) | Track field provenance. Multi-dimension scoring. |
 | Phase 4: UI | Category-blind aggregate scores (Pitfall 9) | Stratify by brand/category in filters and reports. |
 | Phase 4: UI | Scoring data loss (Pitfall 12) | Export button for scoring data. |
+| Phase 5: SerpAPI | Wrong product URL matches (Pitfall 9.5) | Cross-validate brand names, use confidence thresholds, test on sample first. |
 | Phase 6: Polish | Misleading aggregate report | Break down by category, brand popularity, field type. |
 
 ## Sources

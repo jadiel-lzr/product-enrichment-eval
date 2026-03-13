@@ -54,6 +54,15 @@ Features that seem good but would waste time, add complexity, or undermine the t
 | Shopify / PIM integration | "Push winning enrichment data to the store" | This is a validation tool, not a production pipeline. Integration work is premature -- the client hasn't even chosen a tool yet. Building integration before validation is backwards. | Export enriched CSV for the winning tool. Client's existing middleware can ingest it if they choose. |
 | Diff between enrichment tool outputs | "Show me how Claude's description differs from Gemini's" | Text diff between two AI-generated descriptions is noisy and rarely actionable. Both descriptions are fabricated -- diffing them doesn't indicate which is better, just that they're different. | Side-by-side display (already table stakes). Client visually compares and rates. The human judgment IS the diff. |
 
+### URL Discovery Layer (SerpAPI Google Lens)
+
+SerpAPI Google Lens provides a visual product search that takes a product image and returns matching product page URLs from across the web. This is a **pre-enrichment step** that improves scraping accuracy:
+
+- **Input:** Cached product images from Phase 1
+- **Output:** `data/serpapi-urls.json` — a manifest mapping each SKU to discovered product page URLs with confidence scores
+- **Consumption:** Scraping adapters (FireCrawl) optionally use discovered URLs instead of text-based search. All other adapters (Claude, Gemini, Perplexity) are unaffected.
+- **Independence:** Completely detached from the main enrichment pipeline. Can be built and run by a separate developer. Other tools work with or without SerpAPI output.
+
 ## Feature Dependencies
 
 ```
