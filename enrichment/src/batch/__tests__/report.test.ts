@@ -67,7 +67,7 @@ describe('report', () => {
     expect(report.fieldFillRates.made_in).toBe(0.5)
     expect(report.fieldFillRates.weight).toBe(0.5)
     expect(report.fieldFillRates.collection).toBe(0)
-    expect(Object.keys(report.fieldFillRates)).toHaveLength(9)
+    expect(Object.keys(report.fieldFillRates)).toHaveLength(11)
   })
 
   it('writeRunReport writes report JSON to disk', () => {

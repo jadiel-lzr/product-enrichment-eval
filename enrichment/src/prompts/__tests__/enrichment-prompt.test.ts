@@ -60,6 +60,8 @@ describe('buildEnrichmentPrompt', () => {
     expect(prompt).toContain('made_in')
     expect(prompt).toContain('materials')
     expect(prompt).toContain('weight')
+    expect(prompt).toContain('color')
+    expect(prompt).toContain('additional_info')
     expect(prompt).toContain('accuracy_score')
   })
 
@@ -90,7 +92,7 @@ describe('buildEnrichmentPrompt', () => {
     expect(prompt).toMatch(/2-3 sentences/i)
   })
 
-  it('requests JSON output with 9 target fields + accuracy_score', () => {
+  it('requests JSON output with 11 target fields + accuracy_score', () => {
     const product = makeProduct()
     const prompt = buildEnrichmentPrompt(product)
 

@@ -78,6 +78,8 @@ const MOCK_ENRICHED_JSON = {
   made_in: 'Italy',
   materials: 'Calfskin leather',
   weight: '0.8 kg',
+  color: 'Black',
+  additional_info: 'Features GG monogram hardware',
 }
 
 function makeMockResponse(content: string) {
