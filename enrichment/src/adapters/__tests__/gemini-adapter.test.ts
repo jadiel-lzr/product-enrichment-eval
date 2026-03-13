@@ -89,6 +89,8 @@ const FULL_ENRICHMENT_RESPONSE = {
   made_in: 'France',
   materials: '100% Silk',
   weight: '0.1kg',
+  color: 'Orange',
+  additional_info: 'Hand-rolled edges',
   accuracy_score: 9,
 }
 
@@ -102,6 +104,8 @@ const PARTIAL_ENRICHMENT_RESPONSE = {
   made_in: 'France',
   materials: '100% Silk',
   weight: '',
+  color: '',
+  additional_info: '',
   accuracy_score: 6,
 }
 
@@ -225,7 +229,7 @@ describe('Gemini Adapter', () => {
     expect(result.enrichedFields).toContain('description_eng')
     expect(result.enrichedFields).toContain('made_in')
     expect(result.enrichedFields).toContain('materials')
-    expect(result.enrichedFields.length).toBe(9)
+    expect(result.enrichedFields.length).toBe(11)
     expect(result.fields.description_eng).toBe('An exquisite silk scarf handcrafted in France.')
   })
 

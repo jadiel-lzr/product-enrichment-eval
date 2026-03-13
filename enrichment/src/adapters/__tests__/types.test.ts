@@ -10,7 +10,7 @@ import {
 } from '../types.js'
 
 describe('EnrichedFieldsSchema', () => {
-  it('validates object with all 9 target fields', () => {
+  it('validates object with all 11 target fields', () => {
     const input = {
       description_eng: 'A luxury leather bag',
       season: 'FW23',
@@ -21,6 +21,8 @@ describe('EnrichedFieldsSchema', () => {
       made_in: 'Italy',
       materials: 'Full-grain leather',
       weight: '1.2kg',
+      color: 'Black',
+      additional_info: 'Dry clean only',
     }
     const result = EnrichedFieldsSchema.parse(input)
     expect(result.description_eng).toBe('A luxury leather bag')
@@ -61,8 +63,8 @@ describe('EnrichedFieldsSchema', () => {
 })
 
 describe('ENRICHMENT_TARGET_FIELDS', () => {
-  it('contains exactly 9 field names', () => {
-    expect(ENRICHMENT_TARGET_FIELDS).toHaveLength(9)
+  it('contains exactly 11 field names', () => {
+    expect(ENRICHMENT_TARGET_FIELDS).toHaveLength(11)
     expect(ENRICHMENT_TARGET_FIELDS).toContain('description_eng')
     expect(ENRICHMENT_TARGET_FIELDS).toContain('season')
     expect(ENRICHMENT_TARGET_FIELDS).toContain('year')
@@ -72,6 +74,8 @@ describe('ENRICHMENT_TARGET_FIELDS', () => {
     expect(ENRICHMENT_TARGET_FIELDS).toContain('made_in')
     expect(ENRICHMENT_TARGET_FIELDS).toContain('materials')
     expect(ENRICHMENT_TARGET_FIELDS).toContain('weight')
+    expect(ENRICHMENT_TARGET_FIELDS).toContain('color')
+    expect(ENRICHMENT_TARGET_FIELDS).toContain('additional_info')
   })
 })
 
@@ -95,7 +99,7 @@ describe('EnrichmentResult type', () => {
 })
 
 describe('computeFillRate', () => {
-  it('returns correct percentage for partial enrichment (e.g., 6/9 = 0.67)', () => {
+  it('returns correct percentage for partial enrichment (e.g., 6/11 = 0.55)', () => {
     const fields: EnrichedFields = {
       description_eng: 'A luxury bag',
       season: 'FW23',
@@ -103,9 +107,9 @@ describe('computeFillRate', () => {
       collection: 'Fall/Winter',
       gtin: '1234567890123',
       dimensions: '30x20x10cm',
-      // made_in, materials, weight left undefined
+      // made_in, materials, weight, color, additional_info left undefined
     }
-    expect(computeFillRate(fields)).toBe(0.67)
+    expect(computeFillRate(fields)).toBe(0.55)
   })
 
   it('returns 0 for empty fields', () => {
@@ -123,6 +127,8 @@ describe('computeFillRate', () => {
       made_in: 'Italy',
       materials: 'Leather',
       weight: '1kg',
+      color: 'Black',
+      additional_info: 'Dry clean only',
     }
     expect(computeFillRate(fields)).toBe(1)
   })
@@ -133,7 +139,7 @@ describe('computeFillRate', () => {
       season: '',
       year: '',
     }
-    expect(computeFillRate(fields)).toBeCloseTo(1 / 9, 2)
+    expect(computeFillRate(fields)).toBeCloseTo(1 / 11, 2)
   })
 })
 

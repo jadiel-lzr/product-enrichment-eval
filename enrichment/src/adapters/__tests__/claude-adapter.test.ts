@@ -90,6 +90,8 @@ const FULL_ENRICHMENT_RESPONSE = {
   made_in: 'Italy',
   materials: '100% Leather',
   weight: '0.8kg',
+  color: 'Black',
+  additional_info: 'Features GG monogram hardware',
   accuracy_score: 8,
 }
 
@@ -103,6 +105,8 @@ const PARTIAL_ENRICHMENT_RESPONSE = {
   made_in: 'Italy',
   materials: '100% Leather',
   weight: '',
+  color: '',
+  additional_info: '',
   accuracy_score: 5,
 }
 
@@ -238,7 +242,7 @@ describe('Claude Adapter', () => {
     expect(result.enrichedFields).toContain('description_eng')
     expect(result.enrichedFields).toContain('made_in')
     expect(result.enrichedFields).toContain('materials')
-    expect(result.enrichedFields.length).toBe(9)
+    expect(result.enrichedFields.length).toBe(11)
     expect(result.fields.description_eng).toBe('A luxurious leather bag crafted in Italy.')
   })
 

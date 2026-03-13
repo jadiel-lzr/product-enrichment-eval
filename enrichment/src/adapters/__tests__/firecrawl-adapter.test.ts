@@ -106,7 +106,7 @@ describe('FireCrawl Adapter', () => {
     it('detects only missing target fields using source-field mapping rules', () => {
       const fields = getMissingFields(BASE_PRODUCT)
 
-      expect(fields).toEqual(['description_eng', 'dimensions', 'weight'])
+      expect(fields).toEqual(['description_eng', 'dimensions', 'weight', 'additional_info'])
     })
 
     it('treats materials_original as satisfying materials, and description as not satisfying description_eng', () => {
@@ -167,6 +167,7 @@ describe('FireCrawl Adapter', () => {
           description_eng: 'A structured luxury bag description.',
           dimensions: '26 x 15 x 7 cm',
           weight: '0.8 kg',
+          additional_info: 'Features GG monogram hardware',
         },
       })
 
@@ -181,7 +182,7 @@ describe('FireCrawl Adapter', () => {
             expect.objectContaining({
               type: 'json',
               schema: expect.objectContaining({
-                required: ['description_eng', 'dimensions', 'weight'],
+                required: ['description_eng', 'dimensions', 'weight', 'additional_info'],
               }),
             }),
           ],
@@ -191,6 +192,7 @@ describe('FireCrawl Adapter', () => {
         'description_eng',
         'dimensions',
         'weight',
+        'additional_info',
       ])
       expect(result.fillRate).toBe(1)
       expect(result.status).toBe('success')
@@ -205,6 +207,7 @@ describe('FireCrawl Adapter', () => {
           description_eng: 'A structured luxury bag description.',
           dimensions: '26 x 15 x 7 cm',
           weight: '0.8 kg',
+          additional_info: 'Quilted chevron pattern',
         },
       })
 
@@ -237,6 +240,7 @@ describe('FireCrawl Adapter', () => {
           description_eng: 'A structured luxury bag description.',
           dimensions: '26 x 15 x 7 cm',
           weight: '0.8 kg',
+          additional_info: 'Quilted chevron pattern',
         },
       })
 
@@ -261,6 +265,7 @@ describe('FireCrawl Adapter', () => {
         dimensions: '26 x 15 x 7 cm',
         description_eng: 'Already enriched',
         weight: '0.8 kg',
+        additional_info: 'Features GG monogram hardware',
       } as Product
 
       vi.mocked(existsSync).mockReturnValue(false)
@@ -282,6 +287,7 @@ describe('FireCrawl Adapter', () => {
           description_eng: 'A structured luxury bag description.',
           dimensions: '26 x 15 x 7 cm',
           weight: '0.8 kg',
+          additional_info: 'Features GG monogram hardware',
           materials: 'Should be ignored because materials is not missing',
         },
       })
@@ -293,11 +299,13 @@ describe('FireCrawl Adapter', () => {
         description_eng: 'A structured luxury bag description.',
         dimensions: '26 x 15 x 7 cm',
         weight: '0.8 kg',
+        additional_info: 'Features GG monogram hardware',
       })
       expect(result.enrichedFields).toEqual([
         'description_eng',
         'dimensions',
         'weight',
+        'additional_info',
       ])
       expect(result.fillRate).toBe(1)
       expect(result.status).toBe('success')
@@ -328,6 +336,7 @@ describe('FireCrawl Adapter', () => {
           description_eng: 'A structured luxury bag description.',
           dimensions: '26 x 15 x 7 cm',
           weight: '0.8 kg',
+          additional_info: 'Quilted chevron pattern',
         },
       })
 
@@ -363,6 +372,7 @@ describe('FireCrawl Adapter', () => {
           description_eng: 'A structured luxury bag description.',
           dimensions: '26 x 15 x 7 cm',
           weight: '0.8 kg',
+          additional_info: 'Quilted chevron pattern',
         },
       })
 
