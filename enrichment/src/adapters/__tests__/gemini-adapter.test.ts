@@ -3,6 +3,8 @@ import type { Product } from '../../types/product.js'
 
 // Mock the Google GenAI SDK
 const mockGenerateContent = vi.fn()
+const mockOpenAICreate = vi.fn()
+const openAIConfigs: Array<{ apiKey?: string; baseURL?: string }> = []
 
 vi.mock('@google/genai', () => {
   class MockGoogleGenAI {
@@ -10,6 +12,20 @@ vi.mock('@google/genai', () => {
   }
   return {
     GoogleGenAI: MockGoogleGenAI,
+  }
+})
+
+vi.mock('openai', () => {
+  class MockOpenAI {
+    chat = { completions: { create: mockOpenAICreate } }
+
+    constructor(config: { apiKey?: string; baseURL?: string }) {
+      openAIConfigs.push(config)
+    }
+  }
+
+  return {
+    default: MockOpenAI,
   }
 })
 
@@ -98,7 +114,14 @@ function buildGeminiResponse(data: Record<string, unknown>) {
 describe('Gemini Adapter', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockOpenAICreate.mockReset()
+    openAIConfigs.length = 0
     delete process.env.GEMINI_MODEL
+    delete process.env.GEMINI_API_KEY
+    delete process.env.GOOGLE_GENAI_API_KEY
+    delete process.env.GEMINI_BASE_URL
+    delete process.env.LITELLM_API_KEY
+    delete process.env.LITELLM_BASE_URL
   })
 
   it('createGeminiAdapter returns object implementing EnrichmentAdapter with name "gemini"', async () => {
@@ -273,5 +296,40 @@ describe('Gemini Adapter', () => {
 
     callArgs = mockGenerateContent.mock.calls[0][0]
     expect(callArgs.model).toBe('gemini-2.5-pro')
+  })
+
+  it('routes Gemini through LiteLLM when a LiteLLM base URL is configured', async () => {
+    process.env.LITELLM_BASE_URL = 'https://llm.lazertechnologies.com'
+    process.env.GEMINI_API_KEY = 'litellm-gemini-key'
+    process.env.GEMINI_MODEL = 'gemini/gemini-2.5-flash'
+
+    mockOpenAICreate.mockResolvedValue({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify(FULL_ENRICHMENT_RESPONSE),
+          },
+        },
+      ],
+    })
+
+    const { createGeminiAdapter } = await import('../gemini-adapter.js')
+    const adapter = createGeminiAdapter()
+
+    const images = [{ data: Buffer.from('img'), mimeType: 'image/png' }] as const
+    await adapter.enrich(SAMPLE_PRODUCT, images)
+
+    expect(mockGenerateContent).not.toHaveBeenCalled()
+    expect(mockOpenAICreate).toHaveBeenCalledOnce()
+    expect(openAIConfigs[0]).toEqual({
+      apiKey: 'litellm-gemini-key',
+      baseURL: 'https://llm.lazertechnologies.com',
+    })
+
+    const callArgs = mockOpenAICreate.mock.calls[0][0]
+    expect(callArgs.model).toBe('gemini/gemini-2.5-flash')
+    expect(callArgs.response_format.type).toBe('json_schema')
+    expect(callArgs.messages[0].content[0].type).toBe('image_url')
+    expect(callArgs.messages[0].content[0].image_url.url).toContain('data:image/png;base64,')
   })
 })

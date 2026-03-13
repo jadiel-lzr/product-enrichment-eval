@@ -4,16 +4,23 @@ import { EnrichedFieldsSchema, ENRICHMENT_TARGET_FIELDS } from '../types/enriche
 import { buildEnrichmentPrompt } from '../prompts/enrichment-prompt.js'
 import { withRetry } from '../batch/retry.js'
 import { computeFillRate, type EnrichmentAdapter, type EnrichmentResult, type ImageInput } from './types.js'
+import {
+  buildOpenAIContentParts,
+  buildOpenAIJsonSchemaResponseFormat,
+  createLiteLLMClient,
+  shouldUseLiteLLM,
+  tryParseJsonContent,
+} from './litellm.js'
 import type { Product } from '../types/product.js'
 
 const DEFAULT_MODEL = 'claude-haiku-4-5-20250415'
 const MAX_TOKENS = 2048
+const ENRICHED_JSON_SCHEMA = zodToJsonSchema(EnrichedFieldsSchema) as Record<string, unknown>
 
 function buildJsonSchemaFormat(): { type: 'json_schema'; schema: Record<string, unknown> } {
-  const jsonSchema = zodToJsonSchema(EnrichedFieldsSchema)
   return {
     type: 'json_schema' as const,
-    schema: jsonSchema as Record<string, unknown>,
+    schema: ENRICHED_JSON_SCHEMA,
   }
 }
 
@@ -45,8 +52,25 @@ function getEnrichedFieldNames(fields: Record<string, unknown>): readonly string
   })
 }
 
-export function createClaudeAdapter(): EnrichmentAdapter {
-  const client = new Anthropic()
+function buildResult(fields: Record<string, unknown>): EnrichmentResult {
+  const parsed = EnrichedFieldsSchema.parse(fields)
+  const enrichedFields = getEnrichedFieldNames(parsed)
+  const fillRate = computeFillRate(parsed)
+  const status = determineStatus(enrichedFields.length)
+
+  return {
+    fields: parsed,
+    status,
+    fillRate,
+    enrichedFields,
+    accuracyScore: parsed.accuracy_score,
+  }
+}
+
+function createNativeClaudeAdapter(): EnrichmentAdapter {
+  const client = new Anthropic({
+    apiKey: process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY || null,
+  })
   const model = process.env.CLAUDE_MODEL ?? DEFAULT_MODEL
   const outputFormat = buildJsonSchemaFormat()
 
@@ -91,18 +115,7 @@ export function createClaudeAdapter(): EnrichmentAdapter {
           }
         }
 
-        const parsed = EnrichedFieldsSchema.parse(JSON.parse(textBlock.text))
-        const enrichedFields = getEnrichedFieldNames(parsed)
-        const fillRate = computeFillRate(parsed)
-        const status = determineStatus(enrichedFields.length)
-
-        return {
-          fields: parsed,
-          status,
-          fillRate,
-          enrichedFields,
-          accuracyScore: parsed.accuracy_score,
-        }
+        return buildResult(JSON.parse(textBlock.text) as Record<string, unknown>)
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
         return {
@@ -115,4 +128,78 @@ export function createClaudeAdapter(): EnrichmentAdapter {
       }
     },
   }
+}
+
+function createLiteLLMClaudeAdapter(): EnrichmentAdapter {
+  const client = createLiteLLMClient('claude')
+  const model = process.env.CLAUDE_MODEL ?? DEFAULT_MODEL
+  const responseFormat = buildOpenAIJsonSchemaResponseFormat(ENRICHED_JSON_SCHEMA)
+
+  return {
+    name: 'claude',
+
+    async enrich(
+      product: Product,
+      images?: readonly ImageInput[],
+    ): Promise<EnrichmentResult> {
+      try {
+        const promptText = buildEnrichmentPrompt(product)
+
+        const response = await withRetry(
+          () =>
+            client.chat.completions.create({
+              model,
+              max_tokens: MAX_TOKENS,
+              messages: [
+                {
+                  role: 'user',
+                  content: buildOpenAIContentParts(promptText, images),
+                },
+              ],
+              response_format: responseFormat,
+            }),
+          `claude:${product.sku}`,
+        )
+
+        const content = response.choices[0]?.message?.content
+        if (!content) {
+          return {
+            fields: {},
+            status: 'failed',
+            fillRate: 0,
+            enrichedFields: [],
+            error: 'Empty response from Claude LiteLLM route',
+          }
+        }
+
+        const parsed = tryParseJsonContent(content)
+        if (!parsed) {
+          return {
+            fields: {},
+            status: 'failed',
+            fillRate: 0,
+            enrichedFields: [],
+            error: 'Failed to parse JSON from Claude LiteLLM response',
+          }
+        }
+
+        return buildResult(parsed)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        return {
+          fields: {},
+          status: 'failed',
+          fillRate: 0,
+          enrichedFields: [],
+          error: message,
+        }
+      }
+    },
+  }
+}
+
+export function createClaudeAdapter(): EnrichmentAdapter {
+  return shouldUseLiteLLM('claude')
+    ? createLiteLLMClaudeAdapter()
+    : createNativeClaudeAdapter()
 }

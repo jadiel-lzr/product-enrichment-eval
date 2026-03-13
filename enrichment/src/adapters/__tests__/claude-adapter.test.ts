@@ -13,6 +13,23 @@ vi.mock('@anthropic-ai/sdk', () => {
   }
 })
 
+const mockOpenAICreate = vi.fn()
+const openAIConfigs: Array<{ apiKey?: string; baseURL?: string }> = []
+
+vi.mock('openai', () => {
+  class MockOpenAI {
+    chat = { completions: { create: mockOpenAICreate } }
+
+    constructor(config: { apiKey?: string; baseURL?: string }) {
+      openAIConfigs.push(config)
+    }
+  }
+
+  return {
+    default: MockOpenAI,
+  }
+})
+
 // Mock the retry module to skip delays
 vi.mock('../../batch/retry.js', () => ({
   withRetry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
@@ -105,8 +122,15 @@ describe('Claude Adapter', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks()
+    mockOpenAICreate.mockReset()
+    openAIConfigs.length = 0
     // Reset env
     delete process.env.CLAUDE_MODEL
+    delete process.env.CLAUDE_API_KEY
+    delete process.env.ANTHROPIC_API_KEY
+    delete process.env.CLAUDE_BASE_URL
+    delete process.env.LITELLM_API_KEY
+    delete process.env.LITELLM_BASE_URL
 
     const mod = await import('@anthropic-ai/sdk')
     mockCreate = (mod as unknown as { __mockCreate: ReturnType<typeof vi.fn> }).__mockCreate
@@ -286,5 +310,40 @@ describe('Claude Adapter', () => {
 
     callArgs = mockCreate.mock.calls[0][0]
     expect(callArgs.model).toBe('claude-sonnet-4-20250514')
+  })
+
+  it('routes Claude through LiteLLM when a LiteLLM base URL is configured', async () => {
+    process.env.LITELLM_BASE_URL = 'https://llm.lazertechnologies.com'
+    process.env.LITELLM_API_KEY = 'litellm-key'
+    process.env.CLAUDE_MODEL = 'anthropic/claude-haiku-4-5-20250415'
+
+    mockOpenAICreate.mockResolvedValue({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify(FULL_ENRICHMENT_RESPONSE),
+          },
+        },
+      ],
+    })
+
+    const { createClaudeAdapter } = await import('../claude-adapter.js')
+    const adapter = createClaudeAdapter()
+
+    const images = [{ data: Buffer.from('img'), mimeType: 'image/jpeg' }] as const
+    await adapter.enrich(SAMPLE_PRODUCT, images)
+
+    expect(mockCreate).not.toHaveBeenCalled()
+    expect(mockOpenAICreate).toHaveBeenCalledOnce()
+    expect(openAIConfigs[0]).toEqual({
+      apiKey: 'litellm-key',
+      baseURL: 'https://llm.lazertechnologies.com',
+    })
+
+    const callArgs = mockOpenAICreate.mock.calls[0][0]
+    expect(callArgs.model).toBe('anthropic/claude-haiku-4-5-20250415')
+    expect(callArgs.response_format.type).toBe('json_schema')
+    expect(callArgs.messages[0].content[0].type).toBe('image_url')
+    expect(callArgs.messages[0].content[0].image_url.url).toContain('data:image/jpeg;base64,')
   })
 })
