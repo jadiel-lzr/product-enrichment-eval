@@ -9,5 +9,6 @@ export {
 
 export {
   EnrichedFieldsSchema,
+  ENRICHMENT_TARGET_FIELDS,
   type EnrichedFields,
 } from './enriched.js'

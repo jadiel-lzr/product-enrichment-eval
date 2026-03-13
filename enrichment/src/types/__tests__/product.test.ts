@@ -176,11 +176,13 @@ describe('EnrichedFieldsSchema', () => {
     expect(result).toBeDefined()
   })
 
-  it('rejects unknown fields (strict mode)', () => {
+  it('allows unknown fields via passthrough (hybrid approach for LLM extras)', () => {
     const fields = {
       description_eng: 'A beautiful hat',
-      unknown_field: 'should fail',
+      unknown_field: 'extra LLM discovery',
     }
-    expect(() => EnrichedFieldsSchema.parse(fields)).toThrow(ZodError)
+    const result = EnrichedFieldsSchema.parse(fields)
+    expect(result.description_eng).toBe('A beautiful hat')
+    expect((result as Record<string, unknown>).unknown_field).toBe('extra LLM discovery')
   })
 })
