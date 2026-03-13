@@ -5,6 +5,9 @@ import path from 'node:path'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  server: {
+    allowedHosts: true,
+  },
   resolve: {
     alias: {
       '@shared': path.resolve(__dirname, '../enrichment/src/types'),
