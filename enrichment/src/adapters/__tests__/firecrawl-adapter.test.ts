@@ -1,53 +1,62 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Product } from '../../types/product.js'
 import type { EnrichmentAdapter } from '../types.js'
 
-// Mock @mendable/firecrawl-js
 const mockSearch = vi.fn()
 const mockScrape = vi.fn()
+
 vi.mock('@mendable/firecrawl-js', () => {
   class MockFirecrawl {
     search = mockSearch
     scrape = mockScrape
   }
+
   return { default: MockFirecrawl }
 })
 
-// Mock fs for serpApiUrls loading
 vi.mock('node:fs', async () => {
   const actual = await vi.importActual<typeof import('node:fs')>('node:fs')
   return {
     ...actual,
-    readFileSync: vi.fn().mockImplementation((path: string, encoding?: string) => {
-      if (typeof path === 'string' && path.includes('serpapi-urls.json')) {
-        return JSON.stringify({
-          'SKU-001': ['https://brand.com/product/sku-001'],
-          'SKU-002': ['https://brand.com/product/sku-002'],
-        })
-      }
-      return actual.readFileSync(path, encoding as BufferEncoding)
-    }),
+    readFileSync: vi
+      .fn()
+      .mockImplementation((path: string, encoding?: BufferEncoding) => {
+        if (typeof path === 'string' && path.includes('serpapi-urls.json')) {
+          return JSON.stringify({
+            'SKU-001': ['https://brand.com/product/sku-001'],
+          })
+        }
+
+        return actual.readFileSync(path, encoding)
+      }),
     existsSync: vi.fn().mockImplementation((path: string) => {
       if (typeof path === 'string' && path.includes('serpapi-urls.json')) {
         return true
       }
+
       return actual.existsSync(path)
     }),
   }
 })
 
-// Mock retry to call fn directly (no actual delays)
 vi.mock('../../batch/retry.js', () => ({
   withRetry: vi.fn().mockImplementation(
     async <T>(fn: () => Promise<T>, _label: string): Promise<T> => fn(),
   ),
 }))
 
-import { createFirecrawlAdapter, parseMarkdownForFields } from '../firecrawl-adapter.js'
+import {
+  buildJsonSchema,
+  buildScrapePrompt,
+  createFirecrawlAdapter,
+  getCurrentTargetFields,
+  getMissingFields,
+  pickSearchResultUrl,
+} from '../firecrawl-adapter.js'
 import { withRetry } from '../../batch/retry.js'
-import { readFileSync, existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 
-const MOCK_PRODUCT: Product = {
+const BASE_PRODUCT: Product = {
   sku: 'SKU-001',
   code: 'CODE-001',
   gtin: ['1234567890123'],
@@ -79,7 +88,7 @@ const MOCK_PRODUCT: Product = {
   title: 'GG Marmont Classic Leather Bag',
   sizes_raw: '[]',
   season_raw: 'FW23',
-  description: '',
+  description: 'Descrizione originale italiana',
   size_system: 'EU',
   category_item: 'Shoulder Bags',
   season_display: 'Fall Winter 2023',
@@ -87,242 +96,286 @@ const MOCK_PRODUCT: Product = {
   vendor_product_id: 'VENDOR-001',
 }
 
-const MOCK_MARKDOWN = `
-# Gucci GG Marmont Classic Leather Bag
-
-## Product Details
-
-This exquisite leather bag from Gucci's Fall Winter 2023 collection is crafted in Italy from premium calfskin leather.
-
-- **Season:** FW23
-- **Year:** 2023
-- **Collection:** Fall Winter 2023
-- **Materials:** Calfskin leather, gold-tone hardware
-- **Made in:** Italy
-- **Weight:** 0.8 kg
-- **Dimensions:** 26 x 15 x 7 cm
-- **GTIN:** 1234567890123
-
-A timeless investment piece featuring the iconic GG hardware.
-`
-
 describe('FireCrawl Adapter', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     process.env.FIRECRAWL_API_KEY = 'test-api-key'
   })
 
+  describe('helpers', () => {
+    it('detects only missing target fields using source-field mapping rules', () => {
+      const fields = getMissingFields(BASE_PRODUCT)
+
+      expect(fields).toEqual(['description_eng', 'dimensions', 'weight'])
+    })
+
+    it('treats materials_original as satisfying materials, and description as not satisfying description_eng', () => {
+      const currentFields = getCurrentTargetFields(BASE_PRODUCT)
+
+      expect(currentFields.materials).toBe('Pelle di vitello')
+      expect(currentFields.description_eng).toBeUndefined()
+    })
+
+    it('builds JSON schema with only the requested fields', () => {
+      const schema = buildJsonSchema(['description_eng', 'weight'])
+
+      expect(Object.keys(schema.properties)).toEqual([
+        'description_eng',
+        'weight',
+      ])
+      expect(schema.required).toEqual(['description_eng', 'weight'])
+      expect(schema.additionalProperties).toBe(false)
+    })
+
+    it('builds a scrape prompt that requests only missing fields', () => {
+      const prompt = buildScrapePrompt(BASE_PRODUCT, [
+        'description_eng',
+        'weight',
+      ])
+
+      expect(prompt).toContain('description_eng')
+      expect(prompt).toContain('weight')
+      expect(prompt).not.toContain('materials')
+    })
+
+    it('prefers brand-domain URLs when selecting a search result', () => {
+      const url = pickSearchResultUrl(
+        [
+          { url: 'https://shopping.google.com/product/1' },
+          { url: 'https://www.gucci.com/us/en/pr/handbags/item' },
+        ],
+        BASE_PRODUCT,
+      )
+
+      expect(url).toBe('https://www.gucci.com/us/en/pr/handbags/item')
+    })
+  })
+
   describe('createFirecrawlAdapter', () => {
     it('returns object implementing EnrichmentAdapter with name firecrawl', () => {
       const adapter: EnrichmentAdapter = createFirecrawlAdapter()
+
       expect(adapter.name).toBe('firecrawl')
       expect(typeof adapter.enrich).toBe('function')
     })
   })
 
-  describe('enrich() with SerpAPI URLs', () => {
-    it('uses SerpAPI URL directly when serpApiUrls map contains the product SKU', async () => {
+  describe('enrich()', () => {
+    it('uses SerpAPI URL directly, skips search, and performs one JSON scrape', async () => {
       mockScrape.mockResolvedValue({
-        success: true,
-        markdown: MOCK_MARKDOWN,
+        json: {
+          description_eng: 'A structured luxury bag description.',
+          dimensions: '26 x 15 x 7 cm',
+          weight: '0.8 kg',
+        },
       })
 
       const adapter = createFirecrawlAdapter('data/serpapi-urls.json')
-      const result = await adapter.enrich(MOCK_PRODUCT)
+      const result = await adapter.enrich(BASE_PRODUCT)
 
+      expect(mockSearch).not.toHaveBeenCalled()
       expect(mockScrape).toHaveBeenCalledWith(
         'https://brand.com/product/sku-001',
-        expect.objectContaining({ formats: ['markdown'] }),
+        expect.objectContaining({
+          formats: [
+            expect.objectContaining({
+              type: 'json',
+              schema: expect.objectContaining({
+                required: ['description_eng', 'dimensions', 'weight'],
+              }),
+            }),
+          ],
+        }),
       )
-      expect(mockSearch).not.toHaveBeenCalled()
-      expect(result.status).not.toBe('failed')
+      expect(result.enrichedFields).toEqual([
+        'description_eng',
+        'dimensions',
+        'weight',
+      ])
+      expect(result.fillRate).toBe(1)
+      expect(result.status).toBe('success')
     })
-  })
 
-  describe('enrich() with brand site search', () => {
-    it('searches brand site first when no SerpAPI URL available', async () => {
-      const productWithoutSerpApi = { ...MOCK_PRODUCT, sku: 'SKU-NO-SERP' }
-
+    it('searches for a URL first, then performs one JSON scrape without scrapeOptions on search', async () => {
       mockSearch.mockResolvedValue({
-        web: [{ markdown: MOCK_MARKDOWN, url: 'https://brand.com/product' }],
+        web: [{ url: 'https://www.gucci.com/us/en/pr/handbags/item' }],
+      })
+      mockScrape.mockResolvedValue({
+        json: {
+          description_eng: 'A structured luxury bag description.',
+          dimensions: '26 x 15 x 7 cm',
+          weight: '0.8 kg',
+        },
       })
 
-      // Override existsSync to return false for serpapi
-      vi.mocked(existsSync).mockImplementation(((path: string) => {
-        if (typeof path === 'string' && path.includes('serpapi-urls.json')) return false
-        return false
-      }) as typeof existsSync)
+      vi.mocked(existsSync).mockReturnValue(false)
 
-      const adapter = createFirecrawlAdapter('data/serpapi-urls-nonexistent.json')
+      const adapter = createFirecrawlAdapter('data/missing-serpapi.json')
+      const productWithoutSerpApi = { ...BASE_PRODUCT, sku: 'SKU-NO-SERP' }
       const result = await adapter.enrich(productWithoutSerpApi)
 
       expect(mockSearch).toHaveBeenCalledWith(
         expect.stringContaining('Gucci'),
         expect.objectContaining({ limit: 3 }),
       )
-      expect(result.status).not.toBe('failed')
+      expect(mockSearch.mock.calls[0][1]).not.toHaveProperty('scrapeOptions')
+      expect(mockScrape).toHaveBeenCalledWith(
+        'https://www.gucci.com/us/en/pr/handbags/item',
+        expect.any(Object),
+      )
+      expect(result.status).toBe('success')
     })
 
-    it('falls back to Google Shopping search when brand site search returns no results', async () => {
-      const productWithoutSerpApi = { ...MOCK_PRODUCT, sku: 'SKU-NO-SERP' }
-
+    it('falls back to Google Shopping search when primary search returns no usable URL', async () => {
       mockSearch
-        .mockResolvedValueOnce({ web: [] }) // first search: empty
+        .mockResolvedValueOnce({ web: [] })
         .mockResolvedValueOnce({
-          web: [{ markdown: MOCK_MARKDOWN, url: 'https://shopping.google.com/product' }],
+          web: [{ url: 'https://shopping.google.com/product/123' }],
         })
+      mockScrape.mockResolvedValue({
+        json: {
+          description_eng: 'A structured luxury bag description.',
+          dimensions: '26 x 15 x 7 cm',
+          weight: '0.8 kg',
+        },
+      })
 
       vi.mocked(existsSync).mockReturnValue(false)
 
-      const adapter = createFirecrawlAdapter('data/serpapi-urls-nonexistent.json')
+      const adapter = createFirecrawlAdapter('data/missing-serpapi.json')
+      const productWithoutSerpApi = { ...BASE_PRODUCT, sku: 'SKU-NO-SERP' }
       const result = await adapter.enrich(productWithoutSerpApi)
 
       expect(mockSearch).toHaveBeenCalledTimes(2)
-      // Second call should include site:shopping.google.com
-      const secondCallQuery = mockSearch.mock.calls[1][0]
-      expect(secondCallQuery).toContain('site:shopping.google.com')
-      expect(result.status).not.toBe('failed')
+      expect(mockSearch.mock.calls[1][0]).toContain('site:shopping.google.com')
+      expect(mockScrape).toHaveBeenCalledWith(
+        'https://shopping.google.com/product/123',
+        expect.any(Object),
+      )
+      expect(result.status).toBe('success')
     })
-  })
 
-  describe('markdown field extraction', () => {
-    it('scrapes top search result as markdown and extracts enrichment fields', async () => {
-      mockSearch.mockResolvedValue({
-        web: [{ markdown: MOCK_MARKDOWN, url: 'https://brand.com/product' }],
-      })
+    it('skips FireCrawl entirely when no target fields are missing', async () => {
+      const completeProduct = {
+        ...BASE_PRODUCT,
+        dimensions: '26 x 15 x 7 cm',
+        description_eng: 'Already enriched',
+        weight: '0.8 kg',
+      } as Product
 
       vi.mocked(existsSync).mockReturnValue(false)
 
-      const adapter = createFirecrawlAdapter('data/serpapi-urls-nonexistent.json')
-      const productWithoutSerpApi = { ...MOCK_PRODUCT, sku: 'SKU-NO-SERP' }
-      const result = await adapter.enrich(productWithoutSerpApi)
+      const adapter = createFirecrawlAdapter('data/missing-serpapi.json')
+      const result = await adapter.enrich(completeProduct)
 
-      expect(result.fields.materials).toBeDefined()
-      expect(result.fields.made_in).toBeDefined()
+      expect(mockSearch).not.toHaveBeenCalled()
+      expect(mockScrape).not.toHaveBeenCalled()
+      expect(result.fields).toEqual({})
+      expect(result.enrichedFields).toEqual([])
+      expect(result.fillRate).toBe(1)
+      expect(result.status).toBe('success')
     })
-  })
 
-  describe('EnrichmentResult properties', () => {
-    it('returns EnrichmentResult with correct fillRate and enrichedFields', async () => {
+    it('returns only newly populated fields and computes fillRate from final merged completeness', async () => {
       mockScrape.mockResolvedValue({
-        success: true,
-        markdown: MOCK_MARKDOWN,
+        json: {
+          description_eng: 'A structured luxury bag description.',
+          dimensions: '26 x 15 x 7 cm',
+          weight: '0.8 kg',
+          materials: 'Should be ignored because materials is not missing',
+        },
       })
 
       const adapter = createFirecrawlAdapter('data/serpapi-urls.json')
-      const result = await adapter.enrich(MOCK_PRODUCT)
+      const result = await adapter.enrich(BASE_PRODUCT)
 
-      expect(result.fillRate).toBeGreaterThan(0)
-      expect(result.fillRate).toBeLessThanOrEqual(1)
-      expect(result.enrichedFields.length).toBeGreaterThan(0)
-      expect(result.status).toMatch(/^(success|partial)$/)
+      expect(result.fields).toEqual({
+        description_eng: 'A structured luxury bag description.',
+        dimensions: '26 x 15 x 7 cm',
+        weight: '0.8 kg',
+      })
+      expect(result.enrichedFields).toEqual([
+        'description_eng',
+        'dimensions',
+        'weight',
+      ])
+      expect(result.fillRate).toBe(1)
+      expect(result.status).toBe('success')
     })
 
-    it('returns status failed when both search and fallback return no results', async () => {
+    it('returns failed with a clear error when no usable search result can be found', async () => {
       mockSearch
         .mockResolvedValueOnce({ web: [] })
         .mockResolvedValueOnce({ web: [] })
 
       vi.mocked(existsSync).mockReturnValue(false)
 
-      const adapter = createFirecrawlAdapter('data/serpapi-urls-nonexistent.json')
-      const productWithoutSerpApi = { ...MOCK_PRODUCT, sku: 'SKU-NO-SERP' }
+      const adapter = createFirecrawlAdapter('data/missing-serpapi.json')
+      const productWithoutSerpApi = { ...BASE_PRODUCT, sku: 'SKU-NO-SERP' }
       const result = await adapter.enrich(productWithoutSerpApi)
 
       expect(result.status).toBe('failed')
-      expect(result.fillRate).toBe(0)
+      expect(result.error).toContain('No usable search results')
+      expect(result.fillRate).toBeGreaterThan(0)
     })
 
-    it('does NOT include accuracyScore (non-LLM tool)', async () => {
+    it('wraps both search and scrape API calls in withRetry', async () => {
+      mockSearch.mockResolvedValue({
+        web: [{ url: 'https://www.gucci.com/us/en/pr/handbags/item' }],
+      })
       mockScrape.mockResolvedValue({
-        success: true,
-        markdown: MOCK_MARKDOWN,
+        json: {
+          description_eng: 'A structured luxury bag description.',
+          dimensions: '26 x 15 x 7 cm',
+          weight: '0.8 kg',
+        },
       })
 
-      const adapter = createFirecrawlAdapter('data/serpapi-urls.json')
-      const result = await adapter.enrich(MOCK_PRODUCT)
+      vi.mocked(existsSync).mockReturnValue(false)
 
-      expect(result.accuracyScore).toBeUndefined()
+      const adapter = createFirecrawlAdapter('data/missing-serpapi.json')
+      const productWithoutSerpApi = { ...BASE_PRODUCT, sku: 'SKU-NO-SERP' }
+      await adapter.enrich(productWithoutSerpApi)
+
+      expect(withRetry).toHaveBeenCalledTimes(2)
+      expect(withRetry).toHaveBeenNthCalledWith(
+        1,
+        expect.any(Function),
+        'firecrawl-search:SKU-NO-SERP',
+      )
+      expect(withRetry).toHaveBeenNthCalledWith(
+        2,
+        expect.any(Function),
+        'firecrawl-scrape:SKU-NO-SERP',
+      )
     })
-  })
 
-  describe('retry behavior', () => {
-    it('wraps API calls in withRetry', async () => {
-      mockScrape.mockResolvedValue({
-        success: true,
-        markdown: MOCK_MARKDOWN,
-      })
-
-      const adapter = createFirecrawlAdapter('data/serpapi-urls.json')
-      await adapter.enrich(MOCK_PRODUCT)
-
-      expect(withRetry).toHaveBeenCalled()
-    })
-  })
-
-  describe('missing serpApiUrls file', () => {
-    it('gracefully handles missing serpApiUrls file (logs warning, proceeds with search)', async () => {
+    it('gracefully handles missing SerpAPI URLs file and proceeds with search', async () => {
       vi.mocked(existsSync).mockReturnValue(false)
       vi.mocked(readFileSync).mockImplementation(() => {
         throw new Error('ENOENT: no such file')
       })
+      mockSearch.mockResolvedValue({
+        web: [{ url: 'https://www.gucci.com/us/en/pr/handbags/item' }],
+      })
+      mockScrape.mockResolvedValue({
+        json: {
+          description_eng: 'A structured luxury bag description.',
+          dimensions: '26 x 15 x 7 cm',
+          weight: '0.8 kg',
+        },
+      })
 
       const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
-      mockSearch.mockResolvedValue({
-        web: [{ markdown: MOCK_MARKDOWN, url: 'https://brand.com/product' }],
-      })
-
       const adapter = createFirecrawlAdapter('data/missing-file.json')
-      const result = await adapter.enrich(MOCK_PRODUCT)
+      const result = await adapter.enrich(BASE_PRODUCT)
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('SerpAPI'),
-      )
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('SerpAPI'))
       expect(mockSearch).toHaveBeenCalled()
-      expect(result.status).not.toBe('failed')
+      expect(result.status).toBe('success')
 
       consoleSpy.mockRestore()
     })
-  })
-})
-
-describe('parseMarkdownForFields', () => {
-  it('extracts season from markdown', () => {
-    const fields = parseMarkdownForFields(MOCK_MARKDOWN, MOCK_PRODUCT)
-    expect(fields.season).toBeDefined()
-  })
-
-  it('extracts materials from markdown', () => {
-    const fields = parseMarkdownForFields(MOCK_MARKDOWN, MOCK_PRODUCT)
-    expect(fields.materials).toBeDefined()
-  })
-
-  it('extracts made_in from markdown', () => {
-    const fields = parseMarkdownForFields(MOCK_MARKDOWN, MOCK_PRODUCT)
-    expect(fields.made_in).toBeDefined()
-  })
-
-  it('extracts weight from markdown', () => {
-    const fields = parseMarkdownForFields(MOCK_MARKDOWN, MOCK_PRODUCT)
-    expect(fields.weight).toBeDefined()
-  })
-
-  it('extracts dimensions from markdown', () => {
-    const fields = parseMarkdownForFields(MOCK_MARKDOWN, MOCK_PRODUCT)
-    expect(fields.dimensions).toBeDefined()
-  })
-
-  it('extracts description from markdown', () => {
-    const fields = parseMarkdownForFields(MOCK_MARKDOWN, MOCK_PRODUCT)
-    expect(fields.description_eng).toBeDefined()
-  })
-
-  it('returns empty object for empty markdown', () => {
-    const fields = parseMarkdownForFields('', MOCK_PRODUCT)
-    const filledKeys = Object.keys(fields).filter(
-      (k) => fields[k as keyof typeof fields] !== undefined && fields[k as keyof typeof fields] !== '',
-    )
-    expect(filledKeys.length).toBe(0)
   })
 })

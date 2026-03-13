@@ -1,30 +1,52 @@
 import Firecrawl from '@mendable/firecrawl-js'
 import { readFileSync, existsSync } from 'node:fs'
 import type { Product } from '../types/product.js'
-import type { EnrichedFields } from '../types/enriched.js'
-import { EnrichedFieldsSchema } from '../types/enriched.js'
+import {
+  ENRICHMENT_TARGET_FIELDS,
+  EnrichedFieldsSchema,
+  type EnrichedFields,
+} from '../types/enriched.js'
 import type { EnrichmentAdapter, EnrichmentResult } from './types.js'
 import { computeFillRate } from './types.js'
 import { withRetry } from '../batch/retry.js'
 
 const SEARCH_LIMIT = 3
 const ADAPTER_NAME = 'firecrawl'
+const GOOGLE_SHOPPING_HOST = 'shopping.google.com'
+
+type TargetField = (typeof ENRICHMENT_TARGET_FIELDS)[number]
 
 interface SerpApiUrlMap {
   readonly [sku: string]: readonly string[]
 }
 
+interface JsonSchemaProperty {
+  readonly type: 'string'
+  readonly description: string
+}
+
+interface JsonSchema {
+  readonly type: 'object'
+  readonly properties: Record<string, JsonSchemaProperty>
+  readonly required: readonly string[]
+  readonly additionalProperties: false
+}
+
 function loadSerpApiUrls(path: string): SerpApiUrlMap {
   try {
     if (!existsSync(path)) {
-      console.warn(`[FireCrawl] SerpAPI URLs file not found at ${path}, proceeding without pre-discovered URLs`)
+      console.warn(
+        `[FireCrawl] SerpAPI URLs file not found at ${path}, proceeding without pre-discovered URLs`,
+      )
       return {}
     }
     const raw = readFileSync(path, 'utf-8')
     return JSON.parse(raw) as SerpApiUrlMap
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    console.warn(`[FireCrawl] SerpAPI URLs file could not be loaded: ${message}, proceeding without pre-discovered URLs`)
+    console.warn(
+      `[FireCrawl] SerpAPI URLs file could not be loaded: ${message}, proceeding without pre-discovered URLs`,
+    )
     return {}
   }
 }
@@ -35,163 +57,298 @@ function buildSearchQuery(product: Product): string {
 }
 
 function buildGoogleShoppingQuery(product: Product): string {
-  const parts = [product.brand, product.name, 'site:shopping.google.com'].filter(Boolean)
+  const parts = [
+    product.brand,
+    product.name,
+    'site:shopping.google.com',
+  ].filter(Boolean)
   return parts.join(' ')
 }
 
-/**
- * Parse markdown content from a scraped page to extract enrichment fields.
- * Uses regex patterns and heuristics to find product details in semi-structured markdown.
- */
-export function parseMarkdownForFields(
-  markdown: string,
-  _product: Product,
+function getExistingString(
+  product: Product,
+  field: string,
+): string | undefined {
+  const value = (product as Record<string, unknown>)[field]
+  return typeof value === 'string' && value.trim().length > 0
+    ? value.trim()
+    : undefined
+}
+
+function getExistingTargetValue(
+  product: Product,
+  field: TargetField,
+): string | undefined {
+  switch (field) {
+    case 'description_eng':
+      return getExistingString(product, 'description_eng')
+    case 'season':
+      return product.season.trim() || undefined
+    case 'year':
+      return product.year.trim() || undefined
+    case 'collection':
+      return product.collection.trim() || undefined
+    case 'gtin': {
+      const values = product.gtin
+        .map((value) => value.trim())
+        .filter((value) => value.length > 0)
+      return values.length > 0 ? values.join(', ') : undefined
+    }
+    case 'dimensions':
+      return product.dimensions.trim() || undefined
+    case 'made_in':
+      return product.made_in.trim() || undefined
+    case 'materials':
+      return (
+        getExistingString(product, 'materials') ??
+        product.materials_original.trim() ??
+        undefined
+      )
+    case 'weight':
+      return getExistingString(product, 'weight')
+    case 'color':
+      return (
+        getExistingString(product, 'color') ??
+        (product.color_original.trim() || undefined)
+      )
+    case 'additional_info':
+      return undefined
+  }
+}
+
+export function getCurrentTargetFields(
+  product: Product,
 ): Partial<EnrichedFields> {
-  if (!markdown || markdown.trim() === '') {
-    return {}
-  }
+  const fields: Partial<EnrichedFields> = {}
 
-  const fields: Record<string, string | undefined> = {}
-
-  // Extract description from first substantial paragraph (non-header, non-list)
-  const paragraphs = markdown
-    .split('\n\n')
-    .map((p) => p.trim())
-    .filter(
-      (p) =>
-        p.length > 30 &&
-        !p.startsWith('#') &&
-        !p.startsWith('-') &&
-        !p.startsWith('*') &&
-        !p.startsWith('|'),
-    )
-
-  if (paragraphs.length > 0) {
-    fields.description_eng = paragraphs[0].slice(0, 500)
-  }
-
-  // Field extraction patterns: key-value patterns in markdown
-  const patternMap: ReadonlyArray<{
-    readonly field: string
-    readonly patterns: readonly RegExp[]
-  }> = [
-    {
-      field: 'season',
-      patterns: [
-        /\*?\*?Season\*?\*?:?\s*(.+)/i,
-        /Season:\s*(.+)/i,
-        /\b((?:FW|SS|AW|PF|RS)\d{2,4})\b/i,
-      ],
-    },
-    {
-      field: 'year',
-      patterns: [
-        /\*?\*?Year\*?\*?:?\s*(\d{4})/i,
-        /Year:\s*(\d{4})/i,
-      ],
-    },
-    {
-      field: 'collection',
-      patterns: [
-        /\*?\*?Collection\*?\*?:?\s*(.+)/i,
-        /Collection:\s*(.+)/i,
-      ],
-    },
-    {
-      field: 'gtin',
-      patterns: [
-        /\*?\*?GTIN\*?\*?:?\s*(\d{8,14})/i,
-        /\*?\*?Barcode\*?\*?:?\s*(\d{8,14})/i,
-        /\*?\*?EAN\*?\*?:?\s*(\d{8,14})/i,
-        /\*?\*?UPC\*?\*?:?\s*(\d{8,14})/i,
-      ],
-    },
-    {
-      field: 'dimensions',
-      patterns: [
-        /\*?\*?Dimensions?\*?\*?:?\s*(.+)/i,
-        /Dimensions?:\s*(.+)/i,
-        /(\d+\s*x\s*\d+\s*x?\s*\d*\s*(?:cm|mm|in))/i,
-      ],
-    },
-    {
-      field: 'materials',
-      patterns: [
-        /\*?\*?Materials?\*?\*?:?\s*(.+)/i,
-        /Materials?:\s*(.+)/i,
-        /\*?\*?Composition\*?\*?:?\s*(.+)/i,
-        /\*?\*?Fabric\*?\*?:?\s*(.+)/i,
-      ],
-    },
-    {
-      field: 'made_in',
-      patterns: [
-        /\*?\*?Made\s*in\*?\*?:?\s*(.+)/i,
-        /Made\s*in:?\s*(.+)/i,
-        /\*?\*?Country\s*of\s*origin\*?\*?:?\s*(.+)/i,
-        /\*?\*?Origin\*?\*?:?\s*(.+)/i,
-      ],
-    },
-    {
-      field: 'weight',
-      patterns: [
-        /\*?\*?Weight\*?\*?:?\s*(.+)/i,
-        /Weight:\s*(.+)/i,
-        /(\d+(?:\.\d+)?\s*(?:kg|g|lb|oz))/i,
-      ],
-    },
-  ]
-
-  for (const { field, patterns } of patternMap) {
-    for (const pattern of patterns) {
-      const match = markdown.match(pattern)
-      if (match?.[1]) {
-        const value = match[1].trim().replace(/\*+/g, '').trim()
-        if (value.length > 0) {
-          fields[field] = value
-          break
-        }
-      }
+  for (const field of ENRICHMENT_TARGET_FIELDS) {
+    const value = getExistingTargetValue(product, field)
+    if (value !== undefined && value !== '') {
+      fields[field] = value
     }
   }
 
   return fields
 }
 
-function getMarkdownFromSearchResults(
-  data: ReadonlyArray<{ readonly markdown?: string; readonly url?: string }>,
-): string | undefined {
-  for (const item of data) {
-    if (item.markdown && item.markdown.trim().length > 0) {
-      return item.markdown
-    }
+export function getMissingFields(
+  product: Product,
+): readonly TargetField[] {
+  return ENRICHMENT_TARGET_FIELDS.filter(
+    (field) => getExistingTargetValue(product, field) === undefined,
+  )
+}
+
+export function buildJsonSchema(
+  fields: readonly TargetField[],
+): JsonSchema {
+  const properties = Object.fromEntries(
+    fields.map((field) => [
+      field,
+      {
+        type: 'string' as const,
+        description: `Populate ${field}. Return an empty string if the page does not provide a reliable value.`,
+      },
+    ]),
+  )
+
+  return {
+    type: 'object',
+    properties,
+    required: [...fields],
+    additionalProperties: false,
   }
+}
+
+export function buildScrapePrompt(
+  product: Product,
+  fields: readonly TargetField[],
+): string {
+  return `Extract only the requested missing product fields from this page.
+
+Product:
+- Brand: ${product.brand}
+- Name: ${product.name}
+- Model: ${product.model}
+- Color: ${product.color}
+- Category: ${product.category}
+- Department: ${product.department}
+
+Return JSON with exactly these keys:
+${fields.map((field) => `- ${field}`).join('\n')}
+
+Rules:
+- Only use information that is explicitly present on the page.
+- If a requested field is not available or not reliable, return an empty string.
+- Do not add any extra keys.
+- Do not include explanations or markdown.`
+}
+
+function extractUrl(candidate: unknown): string | undefined {
+  if (
+    candidate &&
+    typeof candidate === 'object' &&
+    'url' in candidate &&
+    typeof candidate.url === 'string' &&
+    candidate.url.trim().length > 0
+  ) {
+    return candidate.url
+  }
+
+  if (
+    candidate &&
+    typeof candidate === 'object' &&
+    'metadata' in candidate &&
+    candidate.metadata &&
+    typeof candidate.metadata === 'object' &&
+    'url' in candidate.metadata &&
+    typeof candidate.metadata.url === 'string' &&
+    candidate.metadata.url.trim().length > 0
+  ) {
+    return candidate.metadata.url
+  }
+
   return undefined
 }
 
+function isValidUrl(value: string): boolean {
+  try {
+    new URL(value)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function normalizeBrand(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, '')
+}
+
+function getHostname(value: string): string | undefined {
+  try {
+    return new URL(value).hostname.toLowerCase()
+  } catch {
+    return undefined
+  }
+}
+
+export function pickSearchResultUrl(
+  webResults: readonly unknown[] | undefined,
+  product: Product,
+): string | undefined {
+  const candidates = (webResults ?? [])
+    .map(extractUrl)
+    .filter((value): value is string => value !== undefined && isValidUrl(value))
+
+  if (candidates.length === 0) {
+    return undefined
+  }
+
+  const brandToken = normalizeBrand(product.brand)
+  const brandMatch = candidates.find((url) => {
+    const hostname = getHostname(url)
+    return hostname !== undefined && hostname.includes(brandToken)
+  })
+
+  if (brandMatch) {
+    return brandMatch
+  }
+
+  const nonShopping = candidates.find((url) => {
+    const hostname = getHostname(url)
+    return hostname !== undefined && hostname !== GOOGLE_SHOPPING_HOST
+  })
+
+  return nonShopping ?? candidates[0]
+}
+
+function cleanScrapedFields(
+  rawJson: unknown,
+  requestedFields: readonly TargetField[],
+): Partial<EnrichedFields> {
+  const rawRecord =
+    rawJson && typeof rawJson === 'object'
+      ? (rawJson as Record<string, unknown>)
+      : {}
+
+  const picked = Object.fromEntries(
+    requestedFields.map((field) => [
+      field,
+      typeof rawRecord[field] === 'string' ? rawRecord[field].trim() : '',
+    ]),
+  )
+
+  const validated = EnrichedFieldsSchema.parse(picked)
+  const cleanFields: Partial<EnrichedFields> = {}
+
+  for (const field of requestedFields) {
+    const value = validated[field]
+    if (typeof value === 'string' && value.length > 0) {
+      cleanFields[field] = value
+    }
+  }
+
+  return cleanFields
+}
+
 function buildEnrichmentResult(
+  product: Product,
   fields: Partial<EnrichedFields>,
-  status: 'success' | 'partial' | 'failed',
   error?: string,
 ): EnrichmentResult {
-  const validated = EnrichedFieldsSchema.parse(fields)
-  // Remove accuracy_score if it exists -- FireCrawl is not an LLM
-  const { accuracy_score: _removed, ...fieldsWithoutScore } = validated
-  const cleanFields = EnrichedFieldsSchema.parse(fieldsWithoutScore)
-  const fillRate = computeFillRate(cleanFields)
-  const enrichedFields = Object.entries(cleanFields)
+  const existingFields = getCurrentTargetFields(product)
+  const finalFields = EnrichedFieldsSchema.parse({
+    ...existingFields,
+    ...fields,
+  })
+
+  const fillRate = computeFillRate(finalFields)
+  const enrichedFields = Object.entries(fields)
     .filter(([_key, value]) => value !== undefined && value !== '')
     .map(([key]) => key)
 
-  const finalStatus = fillRate === 0 ? 'failed' : fillRate === 1 ? 'success' : status
+  const finalStatus =
+    fillRate === 0 ? 'failed' : fillRate === 1 ? 'success' : 'partial'
 
   return {
-    fields: cleanFields,
+    fields: EnrichedFieldsSchema.parse(fields),
     status: error ? 'failed' : finalStatus,
-    fillRate: error ? 0 : fillRate,
+    fillRate,
     enrichedFields: error ? [] : enrichedFields,
     error,
   }
+}
+
+async function scrapeForMissingFields(
+  client: Firecrawl,
+  url: string,
+  product: Product,
+  missingFields: readonly TargetField[],
+): Promise<EnrichmentResult> {
+  const scrapeResult = await withRetry(
+    () =>
+      client.scrape(url, {
+        formats: [
+          {
+            type: 'json',
+            prompt: buildScrapePrompt(product, missingFields),
+            schema: buildJsonSchema(missingFields),
+          },
+        ],
+      }),
+    `firecrawl-scrape:${product.sku}`,
+  )
+
+  if (!scrapeResult?.json) {
+    return buildEnrichmentResult(
+      product,
+      {},
+      'No structured JSON returned from scraped page',
+    )
+  }
+
+  const cleanFields = cleanScrapedFields(scrapeResult.json, missingFields)
+  return buildEnrichmentResult(product, cleanFields)
 }
 
 export function createFirecrawlAdapter(
@@ -210,69 +367,67 @@ export function createFirecrawlAdapter(
       _images?: readonly import('./types.js').ImageInput[],
     ): Promise<EnrichmentResult> {
       try {
-        // Step 1: Check SerpAPI URLs for direct scrape
-        const serpUrls = serpApiUrls[product.sku]
-        if (serpUrls && serpUrls.length > 0) {
-          const scrapeResult = await withRetry(
-            () =>
-              client.scrape(serpUrls[0], { formats: ['markdown'] }),
-            `firecrawl-scrape-serpapi:${product.sku}`,
-          )
-
-          if (scrapeResult?.markdown) {
-            const fields = parseMarkdownForFields(
-              scrapeResult.markdown,
-              product,
-            )
-            return buildEnrichmentResult(fields, 'partial')
-          }
+        const missingFields = getMissingFields(product)
+        if (missingFields.length === 0) {
+          return buildEnrichmentResult(product, {})
         }
 
-        // Step 2: Brand site search
+        const serpUrl = serpApiUrls[product.sku]?.[0]
+        if (serpUrl) {
+          return await scrapeForMissingFields(
+            client,
+            serpUrl,
+            product,
+            missingFields,
+          )
+        }
+
         const query = buildSearchQuery(product)
         const searchResult = await withRetry(
           () =>
             client.search(query, {
               limit: SEARCH_LIMIT,
-              scrapeOptions: { formats: ['markdown'] },
             }),
           `firecrawl-search:${product.sku}`,
         )
 
-        const searchMarkdown = searchResult?.web
-          ? getMarkdownFromSearchResults(searchResult.web as ReadonlyArray<{ markdown?: string; url?: string }>)
-          : undefined
-
-        if (searchMarkdown) {
-          const fields = parseMarkdownForFields(searchMarkdown, product)
-          return buildEnrichmentResult(fields, 'partial')
+        const primaryUrl = pickSearchResultUrl(searchResult?.web, product)
+        if (primaryUrl) {
+          return await scrapeForMissingFields(
+            client,
+            primaryUrl,
+            product,
+            missingFields,
+          )
         }
 
-        // Step 3: Google Shopping fallback
         const fallbackQuery = buildGoogleShoppingQuery(product)
         const fallbackResult = await withRetry(
           () =>
             client.search(fallbackQuery, {
               limit: SEARCH_LIMIT,
-              scrapeOptions: { formats: ['markdown'] },
             }),
           `firecrawl-search-fallback:${product.sku}`,
         )
 
-        const fallbackMarkdown = fallbackResult?.web
-          ? getMarkdownFromSearchResults(fallbackResult.web as ReadonlyArray<{ markdown?: string; url?: string }>)
-          : undefined
-
-        if (fallbackMarkdown) {
-          const fields = parseMarkdownForFields(fallbackMarkdown, product)
-          return buildEnrichmentResult(fields, 'partial')
+        const fallbackUrl = pickSearchResultUrl(fallbackResult?.web, product)
+        if (fallbackUrl) {
+          return await scrapeForMissingFields(
+            client,
+            fallbackUrl,
+            product,
+            missingFields,
+          )
         }
 
-        // No results from any source
-        return buildEnrichmentResult({}, 'failed', 'No search results found from any source')
+        return buildEnrichmentResult(
+          product,
+          {},
+          'No usable search results found from any source',
+        )
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
-        return buildEnrichmentResult({}, 'failed', message)
+        return buildEnrichmentResult(product, {}, message)
       }
     },
   }
