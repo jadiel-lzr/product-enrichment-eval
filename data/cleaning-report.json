@@ -1,0 +1,18 @@
+{
+  "totalInput": 500,
+  "totalOutput": 498,
+  "removed": [
+    {
+      "sku": "2083",
+      "reason": "Name contains \"Prodotto Test\""
+    },
+    {
+      "sku": "2100",
+      "reason": "Name contains \"Prodotto Test\""
+    }
+  ],
+  "normalizationsApplied": {
+    "colors": 498,
+    "titles": 0
+  }
+}
