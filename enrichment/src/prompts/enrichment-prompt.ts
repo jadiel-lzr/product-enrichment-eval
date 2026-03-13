@@ -1,5 +1,6 @@
 import type { Product } from '../types/product.js'
 import { ENRICHMENT_TARGET_FIELDS } from '../types/enriched.js'
+import { buildLensContextLines } from '../lens/extractor.js'
 
 const FACTUAL_FIELDS = ['gtin', 'dimensions', 'year', 'weight'] as const
 const GENERATIVE_FIELDS = [
@@ -31,8 +32,25 @@ function buildExistingContext(product: Product): string {
   return `Existing field values (confirm or improve):\n${contextEntries.join('\n')}`
 }
 
+function buildLensContext(product: Product): string {
+  const lines = buildLensContextLines(product)
+  if (lines.length === 0) {
+    return ''
+  }
+
+  return `## Visual Match Context (Google Lens)
+
+The following products were identified as visual matches:
+${lines.join('\n')}
+
+Use these to verify or infer: description, materials, color, made_in, collection, season.
+
+`
+}
+
 export function buildEnrichmentPrompt(product: Product): string {
   const existingContext = buildExistingContext(product)
+  const lensContext = buildLensContext(product)
 
   return `You are a luxury product data specialist. Enrich the following product with accurate, high-quality data.
 
@@ -47,7 +65,7 @@ export function buildEnrichmentPrompt(product: Product): string {
 
 ## ${existingContext}
 
-## Target Fields
+${lensContext}## Target Fields
 
 Fill each of the following 11 fields. Return a JSON object with exactly these keys:
 

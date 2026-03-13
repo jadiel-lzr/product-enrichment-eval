@@ -100,4 +100,50 @@ describe('buildEnrichmentPrompt', () => {
     expect(prompt).toContain('accuracy_score')
     expect(prompt).toMatch(/1.*10|1-10/)
   })
+
+  it('includes Visual Match Context when lens data is present', () => {
+    const lensData = JSON.stringify([
+      { title: 'Helen Kaminski Hat', link: 'https://www.nordstrom.com/hat', source: 'Nordstrom', price: '150' },
+      { title: 'Kaminski Provence Hat', link: 'https://www.farfetch.com/hat', source: 'Farfetch', price: null },
+    ])
+    const product = makeProduct({ lens_brand_matches: lensData } as Partial<Product>)
+    const prompt = buildEnrichmentPrompt(product)
+
+    expect(prompt).toContain('Visual Match Context')
+    expect(prompt).toContain('Helen Kaminski Hat')
+    expect(prompt).toContain('via Nordstrom')
+    expect(prompt).toContain('Kaminski Provence Hat')
+  })
+
+  it('does not include Visual Match Context when no lens data', () => {
+    const product = makeProduct()
+    const prompt = buildEnrichmentPrompt(product)
+
+    expect(prompt).not.toContain('Visual Match Context')
+  })
+
+  it('does not include Visual Match Context for error objects', () => {
+    const product = makeProduct({
+      lens_brand_matches: JSON.stringify({ error: 'Provided image link cannot be opened' }),
+    } as Partial<Product>)
+    const prompt = buildEnrichmentPrompt(product)
+
+    expect(prompt).not.toContain('Visual Match Context')
+  })
+
+  it('caps lens context at 5 matches', () => {
+    const many = JSON.stringify(
+      Array.from({ length: 10 }, (_, i) => ({
+        title: `Product ${i}`,
+        link: `https://www.store${i}.com/product`,
+        source: `Store ${i}`,
+      })),
+    )
+    const product = makeProduct({ lens_brand_matches: many } as Partial<Product>)
+    const prompt = buildEnrichmentPrompt(product)
+
+    expect(prompt).toContain('Product 0')
+    expect(prompt).toContain('Product 4')
+    expect(prompt).not.toContain('Product 5')
+  })
 })
