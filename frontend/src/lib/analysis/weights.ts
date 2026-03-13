@@ -41,6 +41,8 @@ export const ANALYSIS_WEIGHT_PRESETS: readonly WeightPreset[] = [
       made_in: 1,
       materials: 1,
       weight: 1,
+      color: 1,
+      additional_info: 1,
     }),
   },
   {
@@ -57,6 +59,8 @@ export const ANALYSIS_WEIGHT_PRESETS: readonly WeightPreset[] = [
       made_in: 1.1,
       materials: 1.2,
       weight: 0.9,
+      color: 0.9,
+      additional_info: 0.7,
     }),
   },
   {
@@ -73,6 +77,8 @@ export const ANALYSIS_WEIGHT_PRESETS: readonly WeightPreset[] = [
       made_in: 1.1,
       materials: 1.1,
       weight: 1.2,
+      color: 1.1,
+      additional_info: 1.0,
     }),
   },
 ]

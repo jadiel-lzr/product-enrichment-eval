@@ -30,6 +30,8 @@ export const CORE_ENRICHMENT_FIELDS = [
   'made_in',
   'materials',
   'weight',
+  'color',
+  'additional_info',
 ] as const
 
 export type CoreEnrichmentField = (typeof CORE_ENRICHMENT_FIELDS)[number]
@@ -47,6 +49,8 @@ export const FIELD_LABELS: Record<CoreEnrichmentField, string> = {
   made_in: 'Made In',
   materials: 'Materials',
   weight: 'Weight',
+  color: 'Color',
+  additional_info: 'Additional Info',
 }
 
 // Enrichment status for a single product from a single tool
