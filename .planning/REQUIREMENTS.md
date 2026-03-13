@@ -11,8 +11,8 @@
 - [x] **PIPE-06**: System cleans product data before enrichment (sanitize titles, normalize colors, filter test/placeholder products, parse embedded JSON fields, trim whitespace)
 - [x] **PIPE-02**: System pre-validates image URLs and caches reachable images for LLM consumption
 - [ ] **PIPE-03**: System runs each product through each enrichment adapter and outputs enriched CSV per tool
-- [ ] **PIPE-04**: System supports checkpoint/resume so batch runs survive crashes without losing progress or API credits
-- [ ] **PIPE-05**: System tracks enrichment metadata per product (fields enriched, status, errors)
+- [x] **PIPE-04**: System supports checkpoint/resume so batch runs survive crashes without losing progress or API credits
+- [x] **PIPE-05**: System tracks enrichment metadata per product (fields enriched, status, errors)
 
 ### Enrichment Adapters
 
@@ -20,8 +20,8 @@
 - [ ] **ENRC-02**: Gemini adapter enriches products using Google GenAI API with vision (text + image)
 - [ ] **ENRC-03**: FireCrawl adapter enriches products by searching brand sites and Google Shopping, then parsing page content; optionally uses SerpAPI-discovered URLs when available
 - [ ] **ENRC-04**: Perplexity adapter enriches products using search-augmented LLM via OpenAI-compatible API
-- [ ] **ENRC-05**: All adapters implement a shared interface and fill the same 6 target fields (description_eng, season, year, collection, gtin, dimensions)
-- [ ] **ENRC-06**: LLM adapters include product images when available for multi-modal enrichment
+- [x] **ENRC-05**: All adapters implement a shared interface and fill the same 6 target fields (description_eng, season, year, collection, gtin, dimensions)
+- [x] **ENRC-06**: LLM adapters include product images when available for multi-modal enrichment
 
 ### SerpAPI URL Discovery (DETACHED)
 
@@ -77,14 +77,14 @@
 | PIPE-06 | Phase 1 | Complete |
 | PIPE-02 | Phase 1 | Complete |
 | PIPE-03 | Phase 2 | Pending |
-| PIPE-04 | Phase 2 | Pending |
-| PIPE-05 | Phase 2 | Pending |
+| PIPE-04 | Phase 2 | Complete |
+| PIPE-05 | Phase 2 | Complete |
 | ENRC-01 | Phase 2 | Pending |
 | ENRC-02 | Phase 2 | Pending |
 | ENRC-03 | Phase 2 | Pending |
 | ENRC-04 | Phase 2 | Pending |
-| ENRC-05 | Phase 2 | Pending |
-| ENRC-06 | Phase 2 | Pending |
+| ENRC-05 | Phase 2 | Complete |
+| ENRC-06 | Phase 2 | Complete |
 | SERP-01 | Phase 5 (DETACHED) | Pending |
 | SERP-02 | Phase 5 (DETACHED) | Pending |
 | SERP-03 | Phase 5 (DETACHED) | Pending |
