@@ -2,7 +2,7 @@
 
 ## Overview
 
-This project delivers a side-by-side comparison of 4 enrichment tools (Claude, Gemini, FireCrawl, Perplexity) across ~500 real products, presented in a React UI where the client can filter, score, and analyze results to choose the best enrichment strategy. The work flows from data foundation through enrichment execution to a two-layer frontend: core comparison UI first, then analysis and reporting on top.
+This project delivers a side-by-side comparison of 4 enrichment tools (Claude, Gemini, FireCrawl, Perplexity) across ~500 real products, presented in a React UI where the client can filter, score, and analyze results to choose the best enrichment strategy. Additionally, SerpAPI (Google Lens) provides a visual URL discovery layer that finds accurate product page URLs to feed into scraping tools. The work flows from data foundation through enrichment execution to a two-layer frontend: core comparison UI first, then analysis and reporting on top.
 
 ## Phases
 
@@ -16,6 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 2: Enrichment Engine** - Build all 4 adapters behind a shared interface, batch runner with checkpoint/resume, and produce enriched CSVs
 - [ ] **Phase 3: Core Comparison UI** - React app with product browsing, side-by-side cards, visual diff, filtering, per-product scoring, and image display
 - [ ] **Phase 4: Analysis and Reporting** - Aggregate dashboard, per-field winner analysis, weighted scores, completeness metrics, and CSV export
+- [ ] **Phase 5: SerpAPI URL Discovery** *(DETACHED)* - Visual product search via SerpAPI Google Lens to find accurate product page URLs; feeds into scraping tools for better extraction accuracy
 
 ## Phase Details
 
@@ -37,7 +38,7 @@ Plans:
 
 ### Phase 2: Enrichment Engine
 **Goal**: All 4 enrichment tools process the full product dataset through a resilient batch runner, producing one enriched CSV per tool with metadata tracking
-**Depends on**: Phase 1
+**Depends on**: Phase 1 (Phase 5 SerpAPI output is optional — scraping adapters work with or without discovered URLs)
 **Requirements**: ENRC-01, ENRC-02, ENRC-03, ENRC-04, ENRC-05, ENRC-06, PIPE-03, PIPE-04, PIPE-05
 **Success Criteria** (what must be TRUE):
   1. Each of the 4 adapters (Claude, Gemini, FireCrawl, Perplexity) implements the shared `EnrichmentAdapter` interface and fills the same 6 target fields (description_eng, season, year, collection, gtin, dimensions)
@@ -85,10 +86,29 @@ Plans:
 - [ ] 04-01: TBD
 - [ ] 04-02: TBD
 
+### Phase 5: SerpAPI URL Discovery *(DETACHED)*
+
+**Goal**: For each product, use SerpAPI Google Lens to perform a visual search with the product image, find the most accurate product page URL, and store the discovered URLs for downstream scraping tools to use
+**Depends on**: Phase 1 (needs cleaned product data and cached images)
+**Independent of**: Phases 2, 3, 4 — can be built and run by a separate developer in parallel with all other phases
+**Requirements**: SERP-01, SERP-02, SERP-03
+**Success Criteria** (what must be TRUE):
+  1. SerpAPI Google Lens adapter takes a product image and returns ranked product page URLs from visual search results
+  2. URL discovery runs against the full product dataset with checkpoint/resume, producing a URL manifest (`data/serpapi-urls.json`) mapping each SKU to its discovered product page URLs
+  3. The URL manifest is consumable by Phase 2's scraping adapters (FireCrawl) as an optional input — if a discovered URL exists for a product, the scraper uses it directly instead of searching by text
+  4. Discovery metadata tracks per-product: search status, number of results found, confidence/relevance of top result, visual match score
+
+**Plans**: TBD
+
+Plans:
+- [ ] 05-01: TBD
+- [ ] 05-02: TBD
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4
+Phases 1-4 execute in numeric order: 1 -> 2 -> 3 -> 4
+Phase 5 is DETACHED and can execute independently after Phase 1, in parallel with Phases 2-4.
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -96,6 +116,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 | 2. Enrichment Engine | 0/0 | Not started | - |
 | 3. Core Comparison UI | 0/0 | Not started | - |
 | 4. Analysis and Reporting | 0/0 | Not started | - |
+| 5. SerpAPI URL Discovery *(DETACHED)* | 0/0 | Not started | - |
 
 ---
 *Roadmap created: 2026-03-13*

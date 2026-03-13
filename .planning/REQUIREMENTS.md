@@ -18,10 +18,16 @@
 
 - [ ] **ENRC-01**: Claude adapter enriches products using Anthropic Messages API with vision (text + image)
 - [ ] **ENRC-02**: Gemini adapter enriches products using Google GenAI API with vision (text + image)
-- [ ] **ENRC-03**: FireCrawl adapter enriches products by searching brand sites and Google Shopping, then parsing page content
+- [ ] **ENRC-03**: FireCrawl adapter enriches products by searching brand sites and Google Shopping, then parsing page content; optionally uses SerpAPI-discovered URLs when available
 - [ ] **ENRC-04**: Perplexity adapter enriches products using search-augmented LLM via OpenAI-compatible API
 - [ ] **ENRC-05**: All adapters implement a shared interface and fill the same 6 target fields (description_eng, season, year, collection, gtin, dimensions)
 - [ ] **ENRC-06**: LLM adapters include product images when available for multi-modal enrichment
+
+### SerpAPI URL Discovery (DETACHED)
+
+- [ ] **SERP-01**: SerpAPI Google Lens adapter takes a product image and returns ranked product page URLs from visual search
+- [ ] **SERP-02**: URL discovery produces a manifest (`data/serpapi-urls.json`) mapping SKUs to discovered product page URLs with metadata (match confidence, result count)
+- [ ] **SERP-03**: URL discovery supports checkpoint/resume for batch processing (same pattern as enrichment runner)
 
 ### Comparison UI
 
@@ -55,7 +61,7 @@
 
 | Feature | Reason |
 |---------|--------|
-| Describely adapter | No public API -- SaaS-only with manual CSV upload |
+| Describely adapter | No public API -- removed from scope entirely |
 | Database integration | Standalone evaluation project, not production pipeline |
 | Shopify sync | No publishing needed, just comparison |
 | Image enrichment (finding better images) | Focus is on data field enrichment |
@@ -79,6 +85,9 @@
 | ENRC-04 | Phase 2 | Pending |
 | ENRC-05 | Phase 2 | Pending |
 | ENRC-06 | Phase 2 | Pending |
+| SERP-01 | Phase 5 (DETACHED) | Pending |
+| SERP-02 | Phase 5 (DETACHED) | Pending |
+| SERP-03 | Phase 5 (DETACHED) | Pending |
 | UI-01 | Phase 3 | Pending |
 | UI-02 | Phase 3 | Pending |
 | UI-03 | Phase 3 | Pending |
@@ -93,8 +102,8 @@
 | UI-12 | Phase 4 | Pending |
 
 **Coverage:**
-- v1 requirements: 24 total
-- Mapped to phases: 24
+- v1 requirements: 27 total (24 core + 3 SerpAPI)
+- Mapped to phases: 27
 - Unmapped: 0
 
 ---

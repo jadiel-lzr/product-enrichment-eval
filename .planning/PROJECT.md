@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A validation project that compares multiple product data enrichment tools (Claude, Gemini, FireCrawl, Perplexity, and stretch candidates Apify/Zyte/Describely) on ~500 real products from vendor feeds. Results are presented in a React comparison UI with filtering and scoring so the client can choose the best enrichment strategy.
+A validation project that compares multiple product data enrichment tools (Claude, Gemini, FireCrawl, Perplexity, stretch candidates Apify/Zyte, and SerpAPI Google Lens for URL discovery) on ~500 real products from vendor feeds. Results are presented in a React comparison UI with filtering and scoring so the client can choose the best enrichment strategy.
 
 ## Core Value
 
@@ -61,15 +61,17 @@ Products come from vendor feeds (270+ boutiques). The CSV has 38 columns includi
 - FireCrawl — Web search + markdown scraping (replicating current approach)
 - Perplexity — Search-augmented LLM
 
-**Stretch 3** (free tiers / trials):
+**URL Discovery** (pre-enrichment):
+- SerpAPI (Google Lens) — Visual product search to find accurate product page URLs. Takes product images, returns matching product pages from across the web. These URLs feed into scraping tools (FireCrawl) for more accurate extraction. Completely independent module that can be built by a separate developer.
+
+**Stretch 2** (free tiers / trials):
 - Apify — Pre-built e-commerce scrapers ($5/mo free credits)
 - Zyte — AI-powered extraction (free trial)
-- Describely — AI product enrichment SaaS (trial)
 
 ## Constraints
 
 - **Tech stack**: TypeScript for enrichment scripts + React/Vite for frontend — unified codebase
-- **Budget**: Use free tiers where possible; estimated ~$20-30 for core 4 tools across 500 products
+- **Budget**: Use free tiers where possible; estimated ~$20-30 for core 4 tools across 500 products + SerpAPI costs for URL discovery
 - **Timeline**: Quick validation project — needs to be presentable to client
 - **Data**: Must use the provided `originalUnEnrichedProductFeed.csv` as the source of truth
 
@@ -80,6 +82,7 @@ Products come from vendor feeds (270+ boutiques). The CSV has 38 columns includi
 | TypeScript for everything | Same language for scripts + React frontend, unified codebase | — Pending |
 | LLM tools get images + text | Multi-modal enrichment should produce better descriptions | — Pending |
 | Scraping tools search brand sites + Google Shopping | Maximum coverage for finding product pages | — Pending |
+| SerpAPI Google Lens for URL discovery | Visual search finds actual product pages more reliably than text search; feeds accurate URLs to scrapers | — Pending |
 | One CSV per tool | Simple comparison, easy to load in React UI | — Pending |
 | LocalStorage for scoring | No backend needed for client ratings | — Pending |
 

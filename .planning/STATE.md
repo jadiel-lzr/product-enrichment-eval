@@ -7,7 +7,7 @@ stopped_at: Completed 01-02-PLAN.md
 last_updated: "2026-03-13T16:42:40Z"
 last_activity: 2026-03-13 -- Completed plan 01-02 (data cleaning pipeline)
 progress:
-  total_phases: 4
+  total_phases: 5
   completed_phases: 0
   total_plans: 3
   completed_plans: 2
@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-03-13)
 
 ## Current Position
 
-Phase: 1 of 4 (Data Foundation)
+Phase: 1 of 5 (Data Foundation)
 Plan: 2 of 3 in current phase
 Status: Executing
 Last activity: 2026-03-13 -- Completed plan 01-02 (data cleaning pipeline)
@@ -58,8 +58,9 @@ Progress: [███████░░░] 67%
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
-- Roadmap: 4-phase coarse structure -- Foundation, Engine, Core UI, Analysis
+- Roadmap: 5-phase structure -- Foundation, Engine, Core UI, Analysis + Phase 5 SerpAPI URL Discovery (DETACHED)
 - Roadmap: Phase 3 (UI) depends only on Phase 1 types, can start with mock CSVs before Phase 2 completes
+- Roadmap: Phase 5 (SerpAPI) is completely independent — depends only on Phase 1 images, can be built by a separate developer in parallel
 - 01-01: Pinned Zod to v3.25 (not v4) for stable API compatibility with research patterns
 - 01-01: Used .passthrough() on ProductSchema, .strict() on EnrichedFieldsSchema
 - 01-01: Row-level error collection in CSV reader (partial results on validation failure)
