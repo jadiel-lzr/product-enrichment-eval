@@ -5,12 +5,13 @@ import type { EnrichmentAdapter } from '../types.js'
 // Mock @mendable/firecrawl-js
 const mockSearch = vi.fn()
 const mockScrapeUrl = vi.fn()
-vi.mock('@mendable/firecrawl-js', () => ({
-  default: vi.fn().mockImplementation(() => ({
-    search: mockSearch,
-    scrapeUrl: mockScrapeUrl,
-  })),
-}))
+vi.mock('@mendable/firecrawl-js', () => {
+  class MockFirecrawl {
+    search = mockSearch
+    scrapeUrl = mockScrapeUrl
+  }
+  return { default: MockFirecrawl }
+})
 
 // Mock fs for serpApiUrls loading
 vi.mock('node:fs', async () => {
