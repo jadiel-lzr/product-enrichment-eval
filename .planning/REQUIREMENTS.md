@@ -7,7 +7,7 @@
 
 ### Data Pipeline
 
-- [ ] **PIPE-01**: System parses source CSV into typed product objects with validated fields
+- [x] **PIPE-01**: System parses source CSV into typed product objects with validated fields
 - [ ] **PIPE-06**: System cleans product data before enrichment (sanitize titles, normalize colors, filter test/placeholder products, parse embedded JSON fields, trim whitespace)
 - [ ] **PIPE-02**: System pre-validates image URLs and caches reachable images for LLM consumption
 - [ ] **PIPE-03**: System runs each product through each enrichment adapter and outputs enriched CSV per tool
@@ -67,7 +67,7 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PIPE-01 | Phase 1 | Pending |
+| PIPE-01 | Phase 1 | Complete |
 | PIPE-06 | Phase 1 | Pending |
 | PIPE-02 | Phase 1 | Pending |
 | PIPE-03 | Phase 2 | Pending |
