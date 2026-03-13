@@ -80,6 +80,7 @@ const MOCK_ENRICHED_JSON = {
   weight: '0.8 kg',
   color: 'Black',
   additional_info: 'Features GG monogram hardware',
+  accuracy_score: 8,
 }
 
 function makeMockResponse(content: string) {
@@ -179,13 +180,13 @@ describe('Perplexity Adapter', () => {
       expect(result.status).toMatch(/^(success|partial)$/)
     })
 
-    it('does NOT include accuracyScore (non-LLM-vision tool)', async () => {
+    it('includes accuracyScore from response', async () => {
       mockCreate.mockResolvedValue(makeMockResponse(JSON.stringify(MOCK_ENRICHED_JSON)))
 
       const adapter = createPerplexityAdapter()
       const result = await adapter.enrich(MOCK_PRODUCT)
 
-      expect(result.accuracyScore).toBeUndefined()
+      expect(result.accuracyScore).toBe(8)
     })
 
     it('returns status failed with error on API failure', async () => {

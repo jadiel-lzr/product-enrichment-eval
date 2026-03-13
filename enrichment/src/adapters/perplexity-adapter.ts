@@ -23,22 +23,19 @@ const enrichedJsonSchema = zodToJsonSchema(EnrichedFieldsSchema) as Record<strin
 function buildPerplexityResult(parsed: Record<string, unknown>): EnrichmentResult {
   const validated = EnrichedFieldsSchema.parse(parsed)
 
-  // Remove accuracy_score if present -- Perplexity is not a vision LLM
-  const { accuracy_score: _removed, ...fieldsWithoutScore } = validated
-  const cleanFields = EnrichedFieldsSchema.parse(fieldsWithoutScore)
-
-  const fillRate = computeFillRate(cleanFields)
-  const enrichedFields = Object.entries(cleanFields)
+  const fillRate = computeFillRate(validated)
+  const enrichedFields = Object.entries(validated)
     .filter(([_key, value]) => value !== undefined && value !== '')
     .map(([key]) => key)
 
   const status = fillRate === 0 ? 'failed' : fillRate === 1 ? 'success' : 'partial'
 
   return {
-    fields: cleanFields,
+    fields: validated,
     status,
     fillRate,
     enrichedFields,
+    accuracyScore: validated.accuracy_score,
   }
 }
 
