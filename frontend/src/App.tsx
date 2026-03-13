@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { BrowserRouter } from 'react-router-dom'
 import { ProductProvider, useProducts } from '@/context/ProductContext'
+import { AnalysisModeToggle } from '@/components/analysis/AnalysisModeToggle'
+import { AnalysisView } from '@/components/analysis/AnalysisView'
 import { ComparisonView } from '@/components/comparison/ComparisonView'
 import { ProductSidebar } from '@/components/sidebar/ProductSidebar'
 
@@ -178,19 +180,30 @@ function SkeletonComparison() {
 
 function AppContent() {
   const { loading, error, filteredProducts, availableTools } = useProducts()
+  const [mode, setMode] = useState<'compare' | 'analysis'>('compare')
 
   return (
     <div className="flex h-screen flex-col">
       <header className="flex items-center justify-between border-b border-gray-200 bg-white px-6 py-3">
-        <h1 className="text-lg font-semibold text-gray-900">
-          Product Enrichment Eval
-        </h1>
+        <div className="flex items-center gap-4">
+          <div>
+            <h1 className="text-lg font-semibold text-gray-900">
+              Product Enrichment Eval
+            </h1>
+            <p className="text-sm text-gray-500">
+              {loading
+                ? 'Loading products...'
+                : error
+                  ? 'Error loading data'
+                  : `${filteredProducts.length} products | ${availableTools.length} tools`}
+            </p>
+          </div>
+          {!loading && !error ? (
+            <AnalysisModeToggle mode={mode} onChange={setMode} />
+          ) : null}
+        </div>
         <span className="text-sm text-gray-500">
-          {loading
-            ? 'Loading products...'
-            : error
-              ? 'Error loading data'
-              : `${filteredProducts.length} products | ${availableTools.length} tools`}
+          Shared filters power both views
         </span>
       </header>
 
@@ -218,7 +231,7 @@ function AppContent() {
               <ResponsiveSidebar />
 
               <main className="min-w-0 flex-1 overflow-hidden bg-gray-50">
-                <ComparisonView />
+                {mode === 'compare' ? <ComparisonView /> : <AnalysisView />}
               </main>
             </>
           )}
