@@ -8,8 +8,8 @@ import {
   type ReactNode,
 } from 'react'
 import { useProductData } from '@/hooks/useProductData'
+import { useUrlParams } from '@/hooks/useUrlParams'
 import {
-  EMPTY_FILTERS,
   TOOL_NAMES,
   type FilterState,
   type Product,
@@ -74,8 +74,9 @@ interface ProductProviderProps {
 
 export function ProductProvider({ children }: ProductProviderProps) {
   const { products, enrichmentsByProduct, loading, error } = useProductData()
-  const [selectedSku, setSelectedSkuState] = useState<string | null>(null)
-  const [filters, setFiltersState] = useState<FilterState>(EMPTY_FILTERS)
+  const { urlSku, urlFilters, setUrlSku, setUrlFilters } = useUrlParams()
+  const [selectedSku, setSelectedSkuState] = useState<string | null>(urlSku)
+  const [filters, setFiltersState] = useState<FilterState>(urlFilters)
 
   const setSelectedSku = useCallback((sku: string) => {
     setSelectedSkuState(sku)
@@ -122,10 +123,38 @@ export function ProductProvider({ children }: ProductProviderProps) {
     [products],
   )
 
-  // Auto-select first filtered product when selection is null or not in filtered results
   useEffect(() => {
+    setFiltersState((current) => {
+      if (
+        current.search === urlFilters.search &&
+        current.brand === urlFilters.brand &&
+        current.category === urlFilters.category &&
+        current.department === urlFilters.department
+      ) {
+        return current
+      }
+
+      return urlFilters
+    })
+  }, [urlFilters])
+
+  useEffect(() => {
+    if (urlSku === selectedSku) {
+      return
+    }
+
+    setSelectedSkuState(urlSku)
+  }, [urlSku, selectedSku])
+
+  useEffect(() => {
+    if (loading) {
+      return
+    }
+
     if (filteredProducts.length === 0) {
-      setSelectedSkuState(null)
+      if (selectedSku !== null) {
+        setSelectedSkuState(null)
+      }
       return
     }
 
@@ -136,7 +165,28 @@ export function ProductProvider({ children }: ProductProviderProps) {
     if (!isSelectedInFiltered) {
       setSelectedSkuState(filteredProducts[0].sku)
     }
-  }, [filteredProducts, selectedSku])
+  }, [filteredProducts, loading, selectedSku])
+
+  useEffect(() => {
+    if (selectedSku === urlSku) {
+      return
+    }
+
+    setUrlSku(selectedSku)
+  }, [selectedSku, setUrlSku, urlSku])
+
+  useEffect(() => {
+    if (
+      filters.search === urlFilters.search &&
+      filters.brand === urlFilters.brand &&
+      filters.category === urlFilters.category &&
+      filters.department === urlFilters.department
+    ) {
+      return
+    }
+
+    setUrlFilters(filters)
+  }, [filters, setUrlFilters, urlFilters])
 
   const value = useMemo<ProductContextValue>(
     () => ({
@@ -183,3 +233,5 @@ export function useProducts(): ProductContextValue {
   }
   return context
 }
+
+export const useProductContext = useProducts

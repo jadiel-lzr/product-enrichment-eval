@@ -1,5 +1,119 @@
+import { useEffect, useState } from 'react'
 import { BrowserRouter } from 'react-router-dom'
 import { ProductProvider, useProducts } from '@/context/ProductContext'
+import { ComparisonView } from '@/components/comparison/ComparisonView'
+import { ProductSidebar } from '@/components/sidebar/ProductSidebar'
+
+function MenuIcon() {
+  return (
+    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M4 6h16M4 12h16M4 18h16"
+      />
+    </svg>
+  )
+}
+
+function CloseIcon() {
+  return (
+    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M6 18L18 6M6 6l12 12"
+      />
+    </svg>
+  )
+}
+
+function useMediaQuery(query: string): boolean {
+  const getMatch = () =>
+    typeof window !== 'undefined' && window.matchMedia(query).matches
+
+  const [matches, setMatches] = useState(getMatch)
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia(query)
+    const onChange = () => setMatches(mediaQuery.matches)
+
+    onChange()
+    mediaQuery.addEventListener('change', onChange)
+
+    return () => {
+      mediaQuery.removeEventListener('change', onChange)
+    }
+  }, [query])
+
+  return matches
+}
+
+function ResponsiveSidebar() {
+  const isDesktop = useMediaQuery('(min-width: 1024px)')
+  const isMobile = useMediaQuery('(max-width: 767px)')
+  const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    if (isDesktop) {
+      setOpen(false)
+    }
+  }, [isDesktop])
+
+  if (isDesktop) {
+    return <ProductSidebar />
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="fixed bottom-4 right-4 z-30 inline-flex items-center gap-2 rounded-full bg-gray-900 px-4 py-3 text-sm font-medium text-white shadow-lg lg:hidden"
+      >
+        <MenuIcon />
+        Browse products
+      </button>
+
+      {open ? (
+        <>
+          <button
+            type="button"
+            aria-label="Close product browser"
+            onClick={() => setOpen(false)}
+            className="fixed inset-0 z-30 bg-gray-950/40"
+          />
+          <div
+            className={`fixed z-40 overflow-hidden bg-white shadow-2xl ${
+              isMobile
+                ? 'inset-x-0 bottom-0 top-24 rounded-t-3xl border-t border-gray-200'
+                : 'bottom-0 left-0 top-0 w-[22rem] border-r border-gray-200'
+            }`}
+          >
+            <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Products</p>
+                <p className="text-xs text-gray-500">
+                  Mobile uses a bottom sheet, tablet uses a drawer.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="rounded-full p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+              >
+                <CloseIcon />
+              </button>
+            </div>
+            <ProductSidebar />
+          </div>
+        </>
+      ) : null}
+    </>
+  )
+}
 
 function SkeletonSidebar() {
   return (
@@ -101,18 +215,10 @@ function AppContent() {
             </>
           ) : (
             <>
-              {/* Sidebar placeholder - implemented in Plan 02 */}
-              <aside className="w-80 shrink-0 border-r border-gray-200 bg-white p-4">
-                <p className="text-sm text-gray-500">
-                  Sidebar ({filteredProducts.length} products)
-                </p>
-              </aside>
+              <ResponsiveSidebar />
 
-              {/* Comparison area placeholder - implemented in Plan 03 */}
-              <main className="flex-1 overflow-auto bg-gray-50 p-6">
-                <p className="text-sm text-gray-500">
-                  Comparison ({availableTools.length} tools available)
-                </p>
+              <main className="min-w-0 flex-1 overflow-hidden bg-gray-50">
+                <ComparisonView />
               </main>
             </>
           )}
