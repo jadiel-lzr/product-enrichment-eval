@@ -22,6 +22,37 @@ Product {
 
 ---
 
+## Target Fields (11 fields)
+
+Every tool attempts to fill the same 11 fields, split by confidence strategy:
+
+**Factual fields** (leave blank if uncertain — wrong data is worse than missing):
+
+| Field | Description | Example |
+|-------|-------------|---------|
+| `gtin` | Global Trade Item Number (barcode) | `"8057963952335"` |
+| `dimensions` | Physical dimensions | `"30 x 20 x 10 cm"` |
+| `year` | Product year | `"2023"` |
+| `weight` | Product weight | `"0.8 kg"` |
+
+**Generative fields** (always attempt to fill, even with moderate confidence):
+
+| Field | Description | Example |
+|-------|-------------|---------|
+| `description_eng` | Luxury e-commerce copy, 2-3 sentences | `"Crafted from calfskin leather..."` |
+| `season` | Season name | `"Fall Winter 2023"` |
+| `collection` | Collection name | `"GG Marmont"` |
+| `materials` | Material composition | `"Calfskin leather, gold-tone hardware"` |
+| `made_in` | Country of manufacture | `"Italy"` |
+| `color` | Normalized color name | `"Black"` |
+| `additional_info` | Supplementary details (care, features) | `"Features quilted chevron pattern..."` |
+
+Each enrichment also returns an `accuracy_score` (integer 1-10) representing overall confidence.
+
+Fill rate = count of non-empty filled fields / 11.
+
+---
+
 ## Shared Output (All Tools)
 
 Every tool returns an `EnrichmentResult`:
@@ -182,16 +213,12 @@ Product (no images)
 │       • Filter stock photo domains    │
 │       • Use first valid retailer URL  │
 │                                       │
-│    b. SerpAPI pre-discovered URLs     │
-│       • Check data/serpapi-urls.json  │
-│       • Use first URL for this SKU   │
-│                                       │
-│    c. FireCrawl search                │
+│    b. FireCrawl search                │
 │       • Query: "brand name model"    │
 │       • Pick best URL (prefer brand  │
 │         domain, avoid Google Shopping)│
 │                                       │
-│    d. Google Shopping fallback         │
+│    c. Google Shopping fallback         │
 │       • Query: "brand name            │
 │         site:shopping.google.com"     │
 │                                       │

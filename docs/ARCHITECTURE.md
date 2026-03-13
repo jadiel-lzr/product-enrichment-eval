@@ -152,12 +152,11 @@ Each enrichment also returns an `accuracy_score` (integer 1-10) representing ove
 **Workflow:**
 1. Identifies which target fields are already filled on the product
 2. If all filled → returns early (no API call)
-3. Checks Google Lens brand match URLs (highest priority — real retailer product pages)
-4. Falls back to `data/serpapi-urls.json` for pre-discovered URLs
-5. Falls back to FireCrawl search (`brand + name + model`, limit 3 results)
-6. Picks best URL (prefers brand-domain matches, avoids Google Shopping)
-7. If no results → falls back to Google Shopping site-specific search
-8. Scrapes picked URL with JSON extraction targeting only missing fields
+3. Checks Google Lens brand match URLs (highest priority — real retailer product pages, stock photo domains filtered)
+4. Falls back to FireCrawl search (`brand + name + model`, limit 3 results)
+5. Picks best URL (prefers brand-domain matches, avoids Google Shopping)
+6. If no results → falls back to Google Shopping site-specific search
+7. Scrapes picked URL with JSON extraction targeting only missing fields
 
 ### Perplexity (Search-Augmented LLM)
 
@@ -227,6 +226,9 @@ npx tsx src/scripts/enrich.ts --tool perplexity
 
 # All tools (runs sequentially: claude → gemini → firecrawl → perplexity)
 npx tsx src/scripts/enrich.ts --tool all
+
+# LLM tools only (claude → gemini → perplexity, skips firecrawl)
+npm run enrich:llm
 
 # Limit to N products (useful for testing)
 npx tsx src/scripts/enrich.ts --tool claude --limit 5

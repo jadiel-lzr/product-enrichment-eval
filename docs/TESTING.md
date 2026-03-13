@@ -224,10 +224,12 @@ Only do this after single-tool runs look healthy.
 
 ```bash
 cd enrichment
+# All tools (claude, gemini, firecrawl, perplexity)
 npx tsx src/scripts/enrich.ts --tool all
-```
 
-This runs claude, gemini, firecrawl, and perplexity in sequence.
+# LLM tools only (claude, gemini, perplexity — skips firecrawl)
+npm run enrich:llm
+```
 
 ### 10. Common Failure Cases
 
@@ -363,6 +365,7 @@ npx tsx src/scripts/enrich.ts --tool gemini
 npx tsx src/scripts/enrich.ts --tool firecrawl
 npx tsx src/scripts/enrich.ts --tool perplexity
 npx tsx src/scripts/enrich.ts --tool all
+npm run enrich:llm  # claude + gemini + perplexity (no firecrawl)
 
 # Frontend: local checks
 cd frontend
