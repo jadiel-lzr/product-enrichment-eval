@@ -9,7 +9,7 @@ import { withRetry } from '../batch/retry.js'
 
 const ADAPTER_NAME = 'perplexity'
 const DEFAULT_MODEL = 'sonar-pro'
-const PERPLEXITY_BASE_URL = 'https://api.perplexity.ai'
+const DEFAULT_PERPLEXITY_BASE_URL = 'https://api.perplexity.ai'
 
 // Pre-compute JSON schema from Zod schema once
 const enrichedJsonSchema = zodToJsonSchema(EnrichedFieldsSchema)
@@ -37,9 +37,10 @@ function tryParseJson(content: string): Record<string, unknown> | undefined {
 
 export function createPerplexityAdapter(): EnrichmentAdapter {
   const apiKey = process.env.PERPLEXITY_API_KEY ?? ''
+  const baseURL = process.env.PERPLEXITY_BASE_URL ?? DEFAULT_PERPLEXITY_BASE_URL
   const client = new OpenAI({
     apiKey,
-    baseURL: PERPLEXITY_BASE_URL,
+    baseURL,
   })
   const model = process.env.PERPLEXITY_MODEL ?? DEFAULT_MODEL
 

@@ -1,5 +1,6 @@
-import { mkdirSync } from 'node:fs'
+import { existsSync, mkdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
+import { loadEnvFile } from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { createClaudeAdapter } from '../adapters/claude-adapter.js'
 import { createFirecrawlAdapter } from '../adapters/firecrawl-adapter.js'
@@ -15,12 +16,17 @@ type ToolOption = ToolName | 'all'
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(scriptDir, '../../../')
+const envPath = resolve(scriptDir, '../../.env')
 const dataDir = resolve(repoRoot, 'data')
 const baseCsvPath = resolve(dataDir, 'base.csv')
 const manifestPath = resolve(dataDir, 'image-manifest.json')
 const imagesDir = resolve(dataDir, 'images')
 const checkpointsDir = resolve(dataDir, 'checkpoints')
 const reportsDir = resolve(dataDir, 'reports')
+
+if (existsSync(envPath)) {
+  loadEnvFile(envPath)
+}
 
 const TOOL_FACTORIES: Record<ToolName, () => EnrichmentAdapter> = {
   claude: createClaudeAdapter,
@@ -48,9 +54,16 @@ async function main(): Promise<void> {
   mkdirSync(checkpointsDir, { recursive: true })
   mkdirSync(reportsDir, { recursive: true })
 
-  const { products, errors } = parseProductCSV(baseCsvPath)
+  const limit = parseLimitArg(process.argv.slice(2))
+
+  const { products: allProducts, errors } = parseProductCSV(baseCsvPath)
   if (errors.length > 0) {
-    console.warn(`Loaded ${products.length} products with ${errors.length} parse errors`)
+    console.warn(`Loaded ${allProducts.length} products with ${errors.length} parse errors`)
+  }
+
+  const products = limit ? allProducts.slice(0, limit) : allProducts
+  if (limit) {
+    console.log(`Limiting to ${products.length} of ${allProducts.length} products`)
   }
 
   const tools = tool === 'all' ? (Object.keys(TOOL_FACTORIES) as ToolName[]) : [tool]
@@ -86,9 +99,21 @@ function parseToolArg(args: readonly string[]): ToolOption | undefined {
   return args[toolIndex + 1] as ToolOption | undefined
 }
 
+function parseLimitArg(args: readonly string[]): number | undefined {
+  const limitIndex = args.indexOf('--limit')
+  if (limitIndex === -1) return undefined
+
+  const value = Number(args[limitIndex + 1])
+  if (!Number.isInteger(value) || value <= 0) {
+    console.error('--limit must be a positive integer')
+    return undefined
+  }
+  return value
+}
+
 function printUsage(): void {
   const scriptName = 'npx tsx src/scripts/enrich.ts'
-  console.error(`Usage: ${scriptName} --tool claude|gemini|firecrawl|perplexity|all`)
+  console.error(`Usage: ${scriptName} --tool claude|gemini|firecrawl|perplexity|all [--limit N]`)
 }
 
 main().catch((error) => {
