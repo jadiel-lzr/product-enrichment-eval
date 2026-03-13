@@ -1,0 +1,79 @@
+// Re-export shared types from enrichment package
+export type { Product, EnrichedFields } from '@shared/index'
+export { ENRICHMENT_TARGET_FIELDS } from '@shared/index'
+
+// Tool identifiers
+export type ToolName = 'claude' | 'gemini' | 'firecrawl' | 'perplexity'
+
+export const TOOL_NAMES: readonly ToolName[] = [
+  'claude',
+  'gemini',
+  'firecrawl',
+  'perplexity',
+] as const
+
+export const TOOL_DISPLAY_NAMES: Record<ToolName, string> = {
+  claude: 'Claude',
+  gemini: 'Gemini',
+  firecrawl: 'FireCrawl',
+  perplexity: 'Perplexity',
+}
+
+// Core enrichment target fields (matches ENRICHMENT_TARGET_FIELDS from shared schema)
+export const CORE_ENRICHMENT_FIELDS = [
+  'description_eng',
+  'season',
+  'year',
+  'collection',
+  'gtin',
+  'dimensions',
+  'made_in',
+  'materials',
+  'weight',
+] as const
+
+export type CoreEnrichmentField = (typeof CORE_ENRICHMENT_FIELDS)[number]
+
+// Field display labels
+export const FIELD_LABELS: Record<CoreEnrichmentField, string> = {
+  description_eng: 'Description (EN)',
+  season: 'Season',
+  year: 'Year',
+  collection: 'Collection',
+  gtin: 'GTIN',
+  dimensions: 'Dimensions',
+  made_in: 'Made In',
+  materials: 'Materials',
+  weight: 'Weight',
+}
+
+// Enrichment status for a single product from a single tool
+export interface ToolEnrichment {
+  readonly sku: string
+  readonly tool: ToolName
+  readonly status: 'success' | 'partial' | 'failed'
+  readonly error?: string
+  readonly accuracyScore?: number
+  readonly fieldsEnriched: number
+  readonly totalFields: number
+  readonly enrichedValues: Readonly<Record<string, string>>
+  readonly originalValues: Readonly<Record<string, string>>
+}
+
+// Field diff status for color coding
+export type FieldStatus = 'enriched' | 'unchanged' | 'missing'
+
+// Filter state
+export interface FilterState {
+  readonly search: string
+  readonly brand: string
+  readonly category: string
+  readonly department: string
+}
+
+export const EMPTY_FILTERS: FilterState = {
+  search: '',
+  brand: '',
+  category: '',
+  department: '',
+}
