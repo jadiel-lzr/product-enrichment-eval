@@ -51,7 +51,6 @@ output one CSV per tool, and present results in a React comparison UI.
 **Stretch 3** (need API keys / free tiers):
 5. **Apify** — Pre-built e-commerce scrapers ($5/mo free credits)
 6. **Zyte** — AI-powered extraction (free trial)
-7. **Describely** — AI product enrichment SaaS (trial)
 
 ---
 
@@ -67,7 +66,6 @@ product-enrichment-eval/
 │   ├── enriched-perplexity.csv
 │   ├── enriched-apify.csv         # stretch
 │   ├── enriched-zyte.csv          # stretch
-│   └── enriched-describely.csv    # stretch
 ├── enrichment/                    # TypeScript enrichment scripts
 │   ├── src/
 │   │   ├── types.ts               # Product type, EnrichedFields type
@@ -81,7 +79,6 @@ product-enrichment-eval/
 │   │   │   ├── perplexity.ts
 │   │   │   ├── apify.ts           # stretch
 │   │   │   ├── zyte.ts            # stretch
-│   │   │   └── describely.ts      # stretch
 │   │   └── run.ts                 # CLI: run one or all tools
 │   ├── .env                       # API keys (gitignored)
 │   ├── package.json
@@ -195,7 +192,7 @@ interface EnrichmentTool {
 
 ### Phase 5: Stretch Tool Adapters
 
-**Goal:** Add Apify, Zyte, and Describely adapters.
+**Goal:** Add Apify and Zyte adapters.
 
 - [ ] **Apify adapter** — Use e-commerce scraping Actor via REST API
   - Search brand + product name on relevant marketplaces
@@ -204,10 +201,6 @@ interface EnrichmentTool {
 - [ ] **Zyte adapter** — AI extraction API
   - Submit product page URLs (found via search)
   - Use AI extraction for structured product fields
-
-- [ ] **Describely adapter** — Product enrichment API
-  - Submit minimal product data
-  - Receive generated descriptions and attributes
 
 ### Phase 6: Polish & Present
 
@@ -314,4 +307,3 @@ _enrichment_error    — error message if failed
 | Perplexity | ~$5-10 | Depends on plan |
 | Apify | ~$5 free tier | May cover 500 products |
 | Zyte | Free trial | Limited requests |
-| Describely | Trial | Need to check limits |

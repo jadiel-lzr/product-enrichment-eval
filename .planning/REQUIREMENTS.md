@@ -38,11 +38,11 @@
 - [ ] **UI-05**: User can filter products by brand, category, department, and enrichment completeness
 - [ ] **UI-06**: User can rate each tool's enrichment quality per product (1-5 stars)
 - [x] **UI-07**: Scores persist to localStorage and survive page refresh
-- [ ] **UI-08**: Aggregate dashboard shows overall scores per tool
-- [ ] **UI-09**: Per-field winner analysis shows which tool is best at each field type
-- [ ] **UI-10**: User can export scoring results as CSV
-- [ ] **UI-11**: Weighted quality scores allow configurable field importance
-- [ ] **UI-12**: Completeness metrics show fill rate per tool per field
+- [x] **UI-08**: Aggregate dashboard shows overall scores per tool
+- [x] **UI-09**: Per-field winner analysis shows which tool is best at each field type
+- [x] **UI-10**: User can export scoring results as CSV
+- [x] **UI-11**: Weighted quality scores allow configurable field importance
+- [x] **UI-12**: Completeness metrics show fill rate per tool per field
 
 ## v2 Requirements
 
@@ -95,11 +95,11 @@
 | UI-05 | Phase 3 | Pending |
 | UI-06 | Phase 3 | Pending |
 | UI-07 | Phase 3 | Complete |
-| UI-08 | Phase 4 | Pending |
-| UI-09 | Phase 4 | Pending |
-| UI-10 | Phase 4 | Pending |
-| UI-11 | Phase 4 | Pending |
-| UI-12 | Phase 4 | Pending |
+| UI-08 | Phase 4 | Complete |
+| UI-09 | Phase 4 | Complete |
+| UI-10 | Phase 4 | Complete |
+| UI-11 | Phase 4 | Complete |
+| UI-12 | Phase 4 | Complete |
 
 **Coverage:**
 - v1 requirements: 27 total (24 core + 3 SerpAPI)
@@ -108,4 +108,4 @@
 
 ---
 *Requirements defined: 2026-03-13*
-*Last updated: 2026-03-13 (UI-07 complete via 03-01)*
+*Last updated: 2026-03-13 (UI-08, UI-09, UI-10, UI-11, UI-12 complete via 04-02)*

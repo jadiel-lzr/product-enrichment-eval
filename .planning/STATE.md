@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: ready_for_next_phase
-stopped_at: Phase 3 complete
-last_updated: "2026-03-13T19:12:00.000Z"
-last_activity: 2026-03-13 -- Completed plan 03-03 after approved visual checkpoint, Phase 3 complete
+status: executing
+stopped_at: Completed 04-analysis-and-reporting-02-PLAN.md
+last_updated: "2026-03-13T19:47:57Z"
+last_activity: 2026-03-13 -- Completed plan 04-02 analysis mode UI, reporting dashboard, and CSV export
 progress:
   total_phases: 5
-  completed_phases: 2
-  total_plans: 10
-  completed_plans: 9
-  percent: 90
+  completed_phases: 4
+  total_plans: 12
+  completed_plans: 12
+  percent: 100
 ---
 
 # Project State
@@ -21,23 +21,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-13)
 
 **Core value:** The client can visually compare enrichment quality across tools and make an informed decision on which approach to adopt.
-**Current focus:** Phase 4: Analysis and Reporting
+**Current focus:** Phase 5: SerpAPI URL Discovery (DETACHED), or git-permission cleanup before any required commits
 
 ## Current Position
 
 Phase: 4 of 5 (Analysis and Reporting)
-Plan: 0 of 0 in current phase
-Status: Ready to plan
-Last activity: 2026-03-13 -- Completed plan 03-03 after approved visual checkpoint, Phase 3 complete
+Plan: 2 of 2 in current phase
+Status: Complete
+Last activity: 2026-03-13 -- Completed plan 04-02 analysis mode UI, reporting dashboard, and CSV export
 
-Progress: [█████████-] 90%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 9
-- Average duration: 7.6 min
-- Total execution time: 0.63 hours
+- Total plans completed: 12
+- Average duration: 8.8 min
+- Total execution time: 1.76 hours
 
 **By Phase:**
 
@@ -46,15 +46,16 @@ Progress: [█████████-] 90%
 | 01-data-foundation | 3 | 23 min | 7.7 min |
 | 02-enrichment-engine | 4 | 31 min | 7.8 min |
 | 03-core-comparison-ui | 3 | 9 min | 9.0 min |
+| 04-analysis-and-reporting | 2 | 29 min | 14.5 min |
 
 **Recent Trend:**
-- Last 5 plans: 02-01 (6min), 03-01 (9min), 03-02 (resumed), 03-03 (resumed)
-- Trend: Stable
+- Last 5 plans: 03-01 (9min), 03-02 (resumed), 03-03 (resumed), 04-01 (16min), 04-02 (13min)
+- Trend: Slightly slower due to UI verification and git-environment friction
 
 *Updated after each plan completion*
+| Phase 04 P02 | 13 | 4 tasks | 12 files |
+| Phase 04 P01 | 16 | 2 tasks | 8 files |
 | Phase 03 P01 | 9 | 2 tasks | 21 files |
-| Phase 02 P02 | 8 | 2 tasks | 5 files |
-| Phase 02 P03 | 7 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -87,6 +88,12 @@ Recent decisions affecting current work:
 - 03-02: Mobile product browser uses a bottom sheet, tablet uses a left drawer, desktop keeps a persistent sidebar
 - 03-03: Comparison diff status uses base product values as the reference source, not the enriched CSV row, to avoid false "unchanged" readings
 - 03-03: Fixed tool positions stay visible even when a tool has no data, making missing coverage explicit in the UI
+- 04-01: Analysis loader accepts both `_accuracy_score` and `_enrichment_accuracy_score`, but missing or invalid values stay undefined
+- 04-01: Analysis rankings split confidence-backed tools from no-confidence tools instead of inventing substitute confidence scores
+- 04-01: Balanced remains the default weighting preset, with named alternates and manual field overrides layered on top
+- 04-02: Analysis remains a top-level sibling mode to Compare and reuses the shared product and filter state
+- 04-02: The dashboard keeps stable full-dataset results visible alongside the active filtered slice
+- 04-02: Tools without confidence data stay visible and explicitly labeled in the dashboard and CSV export
 - [Phase 02]: Used zod-to-json-schema instead of SDK zodOutputFormat for Zod v3 compatibility (SDK requires v4 z.toJSONSchema)
 - 02-03: FireCrawl SDK uses scrape() method (not scrapeUrl) and SearchData.web property (not data)
 - 02-03: Perplexity JSON parse fallback with regex extraction for unreliable structured output
@@ -101,11 +108,12 @@ None yet.
 ### Blockers/Concerns
 
 - Research flag: Perplexity adapter structured output reliability needs empirical validation in Phase 2
+- Environment issue: git writes are still blocked by `.git/index.lock` permission failure on `git add`, so task commits and final metadata commit remain unavailable for 04-01 and 04-02
 - Resolved: Enrichable product count is 498 (500 total - 2 test products)
 - Resolved: Image URL health ratio is 990/995 (99.5%) -- 497 products have images, 1 text-only
 
 ## Session Continuity
 
-Last session: 2026-03-13T19:12:00.000Z
-Stopped at: Phase 3 complete
+Last session: 2026-03-13T19:47:57Z
+Stopped at: Completed 04-analysis-and-reporting-02-PLAN.md
 Resume file: None

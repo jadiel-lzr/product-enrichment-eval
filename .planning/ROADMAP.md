@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Data Foundation** - Parse, clean, and validate source CSV into typed products with image pre-flight
 - [x] **Phase 2: Enrichment Engine** - Build all 4 adapters behind a shared interface, batch runner with checkpoint/resume, and produce enriched CSVs
 - [x] **Phase 3: Core Comparison UI** - React app with product browsing, side-by-side cards, visual diff, filtering, per-product scoring, and image display
-- [ ] **Phase 4: Analysis and Reporting** - Aggregate dashboard, per-field winner analysis, weighted scores, completeness metrics, and CSV export
+- [x] **Phase 4: Analysis and Reporting** - Aggregate dashboard, per-field winner analysis, weighted scores, completeness metrics, and CSV export
 - [ ] **Phase 5: SerpAPI URL Discovery** *(DETACHED)* - Visual product search via SerpAPI Google Lens to find accurate product page URLs; feeds into scraping tools for better extraction accuracy
 
 ## Phase Details
@@ -81,11 +81,11 @@ Plans:
   3. User can configure field importance weights (e.g., description matters more than dimensions) and see weighted quality scores update accordingly
   4. Completeness metrics show fill rate per tool per field, making it clear which tools leave gaps
   5. User can export all scoring results and analysis as a downloadable CSV for sharing with their team
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 04-01: TBD
-- [ ] 04-02: TBD
+- [x] 04-01-PLAN.md — Analysis contracts, score normalization, weighting presets, and tested ranking/completeness engine
+- [x] 04-02-PLAN.md — Analysis mode UI, executive summary, matrix/detail sections, and CSV export
 
 ### Phase 5: SerpAPI URL Discovery *(DETACHED)*
 
@@ -116,9 +116,9 @@ Phase 5 is DETACHED and can execute independently after Phase 1, in parallel wit
 | 1. Data Foundation | 3/3 | Complete | 2026-03-13 |
 | 2. Enrichment Engine | 4/4 | Complete | 2026-03-13 |
 | 3. Core Comparison UI | 3/3 | Complete | 2026-03-13 |
-| 4. Analysis and Reporting | 0/0 | Not started | - |
+| 4. Analysis and Reporting | 2/2 | Complete | 2026-03-13 |
 | 5. SerpAPI URL Discovery *(DETACHED)* | 0/0 | Not started | - |
 
 ---
 *Roadmap created: 2026-03-13*
-*Last updated: 2026-03-13 (Phase 3 complete)*
+*Last updated: 2026-03-13 (Phase 4 plan 04-02 complete)*
