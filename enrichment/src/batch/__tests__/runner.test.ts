@@ -343,10 +343,8 @@ describe('runBatch', () => {
     expect(result.results[1]?.result.status).toBe('success')
   })
 
-  it('logs progress every 10 products', async () => {
-    const products = Array.from({ length: 20 }, (_, index) =>
-      createProduct(`SKU-${index + 1}`),
-    )
+  it('logs progress for each product', async () => {
+    const products = [createProduct('SKU-1'), createProduct('SKU-2')]
     const adapter: EnrichmentAdapter = {
       name: 'claude',
       enrich: vi.fn().mockResolvedValue(createResult()),
@@ -361,14 +359,15 @@ describe('runBatch', () => {
       checkpointDir: '/tmp/checkpoints',
       manifestPath: '/tmp/manifest.json',
       imagesDir: '/tmp/images',
-      concurrency: 4,
+      concurrency: 1,
     })
 
     const progressLogs = consoleLogSpy.mock.calls
       .map((call) => String(call[0]))
-      .filter((line) => line.includes('products processed'))
+      .filter((line) => line.includes('→'))
 
-    expect(progressLogs).toContain('[claude] 10/20 products processed')
-    expect(progressLogs).toContain('[claude] 20/20 products processed')
+    expect(progressLogs).toHaveLength(2)
+    expect(progressLogs[0]).toContain('[claude] 1/2 SKU-1')
+    expect(progressLogs[1]).toContain('[claude] 2/2 SKU-2')
   })
 })

@@ -97,14 +97,9 @@ export async function runBatch(
         writeCheckpoint(checkpointPath, checkpointState)
 
         processedCount += 1
-        if (
-          processedCount % 10 === 0 ||
-          processedCount === options.products.length
-        ) {
-          console.log(
-            `[${options.adapter.name}] ${processedCount}/${options.products.length} products processed`,
-          )
-        }
+        console.log(
+          `[${options.adapter.name}] ${processedCount}/${options.products.length} ${product.sku} → ${result.status} (${result.enrichedFields.length} fields)`,
+        )
 
         return {
           sku: product.sku,
