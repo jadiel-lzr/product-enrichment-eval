@@ -1,5 +1,4 @@
 import Firecrawl from '@mendable/firecrawl-js'
-import { readFileSync, existsSync } from 'node:fs'
 import type { Product } from '../types/product.js'
 import {
   ENRICHMENT_TARGET_FIELDS,
@@ -17,10 +16,6 @@ const GOOGLE_SHOPPING_HOST = 'shopping.google.com'
 
 type TargetField = (typeof ENRICHMENT_TARGET_FIELDS)[number]
 
-interface SerpApiUrlMap {
-  readonly [sku: string]: readonly string[]
-}
-
 interface JsonSchemaProperty {
   readonly type: 'string'
   readonly description: string
@@ -31,25 +26,6 @@ interface JsonSchema {
   readonly properties: Record<string, JsonSchemaProperty>
   readonly required: readonly string[]
   readonly additionalProperties: false
-}
-
-function loadSerpApiUrls(path: string): SerpApiUrlMap {
-  try {
-    if (!existsSync(path)) {
-      console.warn(
-        `[FireCrawl] SerpAPI URLs file not found at ${path}, proceeding without pre-discovered URLs`,
-      )
-      return {}
-    }
-    const raw = readFileSync(path, 'utf-8')
-    return JSON.parse(raw) as SerpApiUrlMap
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    console.warn(
-      `[FireCrawl] SerpAPI URLs file could not be loaded: ${message}, proceeding without pre-discovered URLs`,
-    )
-    return {}
-  }
 }
 
 function buildSearchQuery(product: Product): string {
@@ -352,13 +328,9 @@ async function scrapeForMissingFields(
   return buildEnrichmentResult(product, cleanFields)
 }
 
-export function createFirecrawlAdapter(
-  serpApiUrlsPath?: string,
-): EnrichmentAdapter {
+export function createFirecrawlAdapter(): EnrichmentAdapter {
   const apiKey = process.env.FIRECRAWL_API_KEY ?? ''
   const client = new Firecrawl({ apiKey })
-  const urlsPath = serpApiUrlsPath ?? 'data/serpapi-urls.json'
-  const serpApiUrls = loadSerpApiUrls(urlsPath)
 
   return {
     name: ADAPTER_NAME,
@@ -378,16 +350,6 @@ export function createFirecrawlAdapter(
           return await scrapeForMissingFields(
             client,
             lensUrls[0]!,
-            product,
-            missingFields,
-          )
-        }
-
-        const serpUrl = serpApiUrls[product.sku]?.[0]
-        if (serpUrl) {
-          return await scrapeForMissingFields(
-            client,
-            serpUrl,
             product,
             missingFields,
           )
