@@ -8,6 +8,8 @@ const GENERATIVE_FIELDS = [
   'collection',
   'materials',
   'made_in',
+  'color',
+  'additional_info',
 ] as const
 
 function buildExistingContext(product: Product): string {
@@ -19,6 +21,7 @@ function buildExistingContext(product: Product): string {
     product.materials_original ? `- materials are currently "${product.materials_original}" -- confirm or improve` : '',
     product.dimensions ? `- dimensions is currently "${product.dimensions}" -- confirm or improve` : '',
     product.gtin?.length ? `- gtin is currently "${product.gtin.join(', ')}" -- confirm or improve` : '',
+    (product.color_original || product.color) ? `- color is currently "${product.color_original || product.color}" -- confirm or improve` : '',
   ].filter((line) => line !== '')
 
   if (contextEntries.length === 0) {
@@ -46,7 +49,7 @@ export function buildEnrichmentPrompt(product: Product): string {
 
 ## Target Fields
 
-Fill each of the following 9 fields. Return a JSON object with exactly these keys:
+Fill each of the following 11 fields. Return a JSON object with exactly these keys:
 
 ${ENRICHMENT_TARGET_FIELDS.map((f) => `- \`${f}\``).join('\n')}
 - \`accuracy_score\` (integer 1-10): your overall confidence in this enrichment
@@ -61,9 +64,17 @@ ${ENRICHMENT_TARGET_FIELDS.map((f) => `- \`${f}\``).join('\n')}
 
 Write \`description_eng\` as luxury e-commerce copy, 2-3 sentences, professional style (think NET-A-PORTER / SSENSE -- concise, elegant, highlights materials and design).
 
+## Color Guidelines
+
+Write \`color\` as a clean, human-readable color name. Normalize abbreviations and codes (e.g. "BLK" → "Black", "NVY BLU" → "Navy Blue"). Use the product images to verify and refine the color when available.
+
+## Additional Info Guidelines
+
+Write \`additional_info\` as a concise summary of supplementary product details not captured by other fields. Include care instructions, notable design features, functional attributes, or construction details when available. 1-2 sentences, factual tone. Leave blank if no meaningful additional context can be inferred.
+
 ## Output Format
 
-Return ONLY a valid JSON object with the 9 target fields plus \`accuracy_score\` (integer 1-10). No markdown, no explanation, no wrapping.
+Return ONLY a valid JSON object with the 11 target fields plus \`accuracy_score\` (integer 1-10). No markdown, no explanation, no wrapping.
 
 Example structure:
 \`\`\`json
@@ -77,6 +88,8 @@ Example structure:
   "made_in": "...",
   "materials": "...",
   "weight": "...",
+  "color": "...",
+  "additional_info": "...",
   "accuracy_score": 7
 }
 \`\`\`

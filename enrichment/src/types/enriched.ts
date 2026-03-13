@@ -10,6 +10,8 @@ export const ENRICHMENT_TARGET_FIELDS = [
   'made_in',
   'materials',
   'weight',
+  'color',
+  'additional_info',
 ] as const
 
 export const EnrichedFieldsSchema = z
@@ -23,6 +25,8 @@ export const EnrichedFieldsSchema = z
     made_in: z.string().optional(),
     materials: z.string().optional(),
     weight: z.string().optional(),
+    color: z.string().optional(),
+    additional_info: z.string().optional(),
     accuracy_score: z.number().int().min(1).max(10).optional(),
   })
   .passthrough()
