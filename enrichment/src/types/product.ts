@@ -58,9 +58,17 @@ export const ProductSchema = z
     season_display: z.string(),
     sizes_original: z.string(),
     vendor_product_id: z.string(),
-    _missing_fields: z.number().optional(),
-    _has_images: z.boolean().optional(),
-    _image_count: z.number().optional(),
+    _missing_fields: z.coerce.number().optional(),
+    _has_images: z.preprocess(
+      (val) => {
+        if (val === undefined || val === '') return undefined
+        if (typeof val === 'boolean') return val
+        if (typeof val === 'string') return val.toLowerCase() === 'true'
+        return Boolean(val)
+      },
+      z.boolean().optional(),
+    ),
+    _image_count: z.coerce.number().optional(),
   })
   .passthrough()
 

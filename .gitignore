@@ -4,3 +4,5 @@ node_modules/
 !.env.example
 dist/
 .claude/
+data/images/
+data/image-manifest.json

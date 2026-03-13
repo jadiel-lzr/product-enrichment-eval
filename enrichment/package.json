@@ -10,7 +10,8 @@
     "test": "vitest run --reporter=verbose",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
-    "parse-and-clean": "tsx src/scripts/parse-and-clean.ts"
+    "parse-and-clean": "tsx src/scripts/parse-and-clean.ts",
+    "cache-images": "tsx src/scripts/cache-images.ts"
   },
   "keywords": [],
   "author": "",
