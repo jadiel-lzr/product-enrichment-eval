@@ -41,6 +41,9 @@ product-enrichment-eval/
 │       │   ├── downloader.ts   # Parallel image download
 │       │   ├── resizer.ts      # Resize for LLM input
 │       │   └── manifest.ts     # Image metadata tracking
+│       ├── lens/               # Google Lens visual match data
+│       │   ├── types.ts        # LensMatch schema, stock photo blocklist
+│       │   └── extractor.ts    # Parse, filter, extract URLs and context
 │       ├── parsers/            # CSV I/O
 │       │   ├── csv-reader.ts
 │       │   └── csv-writer.ts
@@ -149,11 +152,12 @@ Each enrichment also returns an `accuracy_score` (integer 1-10) representing ove
 **Workflow:**
 1. Identifies which target fields are already filled on the product
 2. If all filled → returns early (no API call)
-3. Checks `data/serpapi-urls.json` for pre-discovered URLs
-4. Falls back to FireCrawl search (`brand + name + model`, limit 3 results)
-5. Picks best URL (prefers brand-domain matches, avoids Google Shopping)
-6. If no results → falls back to Google Shopping site-specific search
-7. Scrapes picked URL with JSON extraction targeting only missing fields
+3. Checks Google Lens brand match URLs (highest priority — real retailer product pages)
+4. Falls back to `data/serpapi-urls.json` for pre-discovered URLs
+5. Falls back to FireCrawl search (`brand + name + model`, limit 3 results)
+6. Picks best URL (prefers brand-domain matches, avoids Google Shopping)
+7. If no results → falls back to Google Shopping site-specific search
+8. Scrapes picked URL with JSON extraction targeting only missing fields
 
 ### Perplexity (Search-Augmented LLM)
 
@@ -167,20 +171,21 @@ Each enrichment also returns an `accuracy_score` (integer 1-10) representing ove
 | Supports images | No |
 | Output format | `json_schema` response format |
 | Concurrency | 3 |
-| Special behavior | Strips `accuracy_score` (not a vision model), has regex-based JSON extraction fallback for free-text responses |
+| Special behavior | Regex-based JSON extraction fallback for free-text responses |
 
 ### LiteLLM Proxy (Optional)
 
-Both Claude and Gemini can be routed through a LiteLLM proxy for cost optimization or centralized API management.
+Claude, Gemini, and Perplexity can be routed through a LiteLLM proxy for cost optimization or centralized API management.
 
 | Env var | Effect |
 |---------|--------|
 | `CLAUDE_BASE_URL` | Routes Claude through LiteLLM |
 | `GEMINI_BASE_URL` | Routes Gemini through LiteLLM |
-| `LITELLM_BASE_URL` | Fallback for both tools |
+| `PERPLEXITY_BASE_URL` | Routes Perplexity through LiteLLM |
+| `LITELLM_BASE_URL` | Fallback for all tools |
 | `LITELLM_API_KEY` | API key for the proxy |
 
-When LiteLLM is active, adapters use the OpenAI SDK with the proxy's base URL instead of native SDKs. Image content is converted to OpenAI-compatible `image_url` parts with base64 data URIs.
+When LiteLLM is active, adapters use the OpenAI SDK with the proxy's base URL instead of native SDKs. Image content is converted to OpenAI-compatible `image_url` parts with base64 data URIs. When using LiteLLM, prefix model names with the provider (e.g. `PERPLEXITY_MODEL=perplexity/sonar-pro`). Empty-string `*_BASE_URL` values are treated as unset and fall through to `LITELLM_BASE_URL`.
 
 ---
 
@@ -267,7 +272,7 @@ Checkpoints are stored in `data/checkpoints/checkpoint-{tool}.json`. Delete a ch
 
 ### Input
 
-**`data/base.csv`** — Cleaned product feed with ~500 luxury fashion items.
+**`data/base.csv`** — Cleaned product feed with ~500 luxury fashion items, enriched with Google Lens visual match data.
 
 Key product fields:
 
@@ -286,8 +291,25 @@ Key product fields:
 | `gtin` | JSON array of barcodes |
 | `sizes` | JSON array of size/price entries |
 | `errors` | JSON array of validation errors |
+| `lens_all_matches` | JSON array of Google Lens visual matches (title, link, source) |
+| `lens_brand_matches` | JSON array filtered to brand-matching retailer pages |
 | `_missing_fields` | Count of empty required fields |
 | `_has_images` / `_image_count` | Image availability metadata |
+
+### Google Lens Data
+
+The base CSV includes visual match data from SerpAPI Google Lens. Each product's image was searched, producing:
+
+- **`lens_brand_matches`** — Retailer pages matching the product's brand (224/500 products). Contains real product URLs from sites like Farfetch, Nordstrom, TheRealReal, etc.
+- **`lens_all_matches`** — All visual matches including stock photos (231/500 products).
+
+Each match is an object with `title`, `link`, `source`, `thumbnail`, `price`, `rating`, `reviews`. Some products have `{"error": "..."}` instead of arrays (image URL was not reachable).
+
+**How lens data is used:**
+- **LLM tools (Claude, Gemini, Perplexity)**: Up to 5 brand match titles/sources are injected into the enrichment prompt as "Visual Match Context", giving the LLM strong signals for description, materials, color, and made_in.
+- **FireCrawl**: Brand match URLs are used as the highest-priority scraping targets, skipping the search step entirely. Stock photo domains (iStock, Getty, Shutterstock, etc.) are filtered out.
+
+Lens data passes through the pipeline as raw JSON strings via Zod's `.passthrough()` — no schema changes needed. The `enrichment/src/lens/` module handles parsing and filtering on demand.
 
 ### Image Pipeline
 
@@ -315,7 +337,7 @@ Each row contains the original product fields plus:
 | `weight` | Enriched weight |
 | `color` | Enriched/normalized color |
 | `additional_info` | Supplementary product details |
-| `accuracy_score` | LLM confidence (1-10, vision tools only) |
+| `accuracy_score` | LLM self-reported confidence (1-10) |
 | `_enrichment_tool` | Tool name |
 | `_enrichment_status` | `success` / `partial` / `failed` |
 | `_enrichment_fill_rate` | 0-1, fraction of target fields filled |
@@ -331,16 +353,17 @@ Contains: total/success/partial/failed counts, average fill rate, per-field fill
 
 ## Enrichment Prompt
 
-The prompt sent to vision LLMs (Claude, Gemini) follows this structure:
+The prompt sent to all LLM tools (Claude, Gemini, Perplexity) follows this structure:
 
 1. **Product Identity** — Brand, Name, Model, Color, Category, Department
 2. **Existing Context** — Current field values marked "confirm or improve" (season, year, collection, made_in, materials, dimensions, gtin, color)
-3. **Target Fields** — Lists all 11 fields + accuracy_score
-4. **Confidence Strategy** — Factual fields: leave blank if uncertain. Generative fields: always attempt
-5. **Description Tone** — Luxury e-commerce copy (NET-A-PORTER / SSENSE style)
-6. **Color Guidelines** — Normalize abbreviations, verify against images
-7. **Additional Info Guidelines** — Care instructions, design features, 1-2 sentences
-8. **Output Format** — Pure JSON, no markdown wrapping
+3. **Visual Match Context** (when available) — Up to 5 Google Lens brand matches with title, source, and price. Instructs the LLM to use these to verify or infer description, materials, color, made_in, collection, season
+4. **Target Fields** — Lists all 11 fields + accuracy_score
+5. **Confidence Strategy** — Factual fields: leave blank if uncertain. Generative fields: always attempt
+6. **Description Tone** — Luxury e-commerce copy (NET-A-PORTER / SSENSE style)
+7. **Color Guidelines** — Normalize abbreviations, verify against images
+8. **Additional Info Guidelines** — Care instructions, design features, 1-2 sentences
+9. **Output Format** — Pure JSON, no markdown wrapping
 
 ---
 
@@ -461,13 +484,14 @@ URL parameters persist selected product and filters across page loads (`?product
 
 **Claude:** `CLAUDE_API_KEY` → `LITELLM_API_KEY` → `ANTHROPIC_API_KEY`
 **Gemini:** `GEMINI_API_KEY` → `LITELLM_API_KEY` → `GOOGLE_GENAI_API_KEY`
+**Perplexity:** `PERPLEXITY_API_KEY` → `LITELLM_API_KEY`
 
 ---
 
 ## Testing
 
 ```bash
-# Enrichment tests (175 tests)
+# Enrichment tests (204 tests)
 cd enrichment && npm test
 
 # With coverage
@@ -480,4 +504,4 @@ npm run typecheck
 cd frontend && npm run build
 ```
 
-Test coverage spans: adapter behavior, schema validation, fill rate calculation, prompt construction, batch processing, checkpoint resume, CSV parsing, image resizing, cleaning/normalization, and report generation.
+Test coverage spans: adapter behavior, schema validation, fill rate calculation, prompt construction, batch processing, checkpoint resume, CSV parsing, image resizing, cleaning/normalization, report generation, and lens data extraction/filtering.
