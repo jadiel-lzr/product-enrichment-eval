@@ -13,7 +13,7 @@ import { ProductHeader } from './ProductHeader'
 
 function EmptyCard({ tool }: { readonly tool: ToolName }) {
   return (
-    <div className="flex min-h-[28rem] items-center justify-center rounded-2xl border border-dashed border-gray-300 bg-white p-6 text-center">
+    <div className="flex min-h-112 items-center justify-center rounded-2xl border border-dashed border-gray-300 bg-white p-6 text-center">
       <div className="space-y-2">
         <h3 className="text-base font-semibold text-gray-700">
           {TOOL_DISPLAY_NAMES[tool]}

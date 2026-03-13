@@ -57,12 +57,7 @@ function ResponsiveSidebar() {
   const isDesktop = useMediaQuery('(min-width: 1024px)')
   const isMobile = useMediaQuery('(max-width: 767px)')
   const [open, setOpen] = useState(false)
-
-  useEffect(() => {
-    if (isDesktop) {
-      setOpen(false)
-    }
-  }, [isDesktop])
+  const sidebarOpen = open && !isDesktop
 
   if (isDesktop) {
     return <ProductSidebar />
@@ -79,7 +74,7 @@ function ResponsiveSidebar() {
         Browse products
       </button>
 
-      {open ? (
+      {sidebarOpen ? (
         <>
           <button
             type="button"
@@ -91,7 +86,7 @@ function ResponsiveSidebar() {
             className={`fixed z-40 overflow-hidden bg-white shadow-2xl ${
               isMobile
                 ? 'inset-x-0 bottom-0 top-24 rounded-t-3xl border-t border-gray-200'
-                : 'bottom-0 left-0 top-0 w-[22rem] border-r border-gray-200'
+                : 'bottom-0 left-0 top-0 w-88 border-r border-gray-200'
             }`}
           >
             <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
