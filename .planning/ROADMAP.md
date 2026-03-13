@@ -1,0 +1,101 @@
+# Roadmap: Product Enrichment Evaluation
+
+## Overview
+
+This project delivers a side-by-side comparison of 4 enrichment tools (Claude, Gemini, FireCrawl, Perplexity) across ~500 real products, presented in a React UI where the client can filter, score, and analyze results to choose the best enrichment strategy. The work flows from data foundation through enrichment execution to a two-layer frontend: core comparison UI first, then analysis and reporting on top.
+
+## Phases
+
+**Phase Numbering:**
+- Integer phases (1, 2, 3): Planned milestone work
+- Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
+
+Decimal phases appear between their surrounding integers in numeric order.
+
+- [ ] **Phase 1: Data Foundation** - Parse, clean, and validate source CSV into typed products with image pre-flight
+- [ ] **Phase 2: Enrichment Engine** - Build all 4 adapters behind a shared interface, batch runner with checkpoint/resume, and produce enriched CSVs
+- [ ] **Phase 3: Core Comparison UI** - React app with product browsing, side-by-side cards, visual diff, filtering, per-product scoring, and image display
+- [ ] **Phase 4: Analysis and Reporting** - Aggregate dashboard, per-field winner analysis, weighted scores, completeness metrics, and CSV export
+
+## Phase Details
+
+### Phase 1: Data Foundation
+**Goal**: Products from the source CSV are reliably parsed, cleaned, validated, and ready for enrichment -- with working image URLs identified and cached
+**Depends on**: Nothing (first phase)
+**Requirements**: PIPE-01, PIPE-06, PIPE-02
+**Success Criteria** (what must be TRUE):
+  1. Running the CSV parser against `originalUnEnrichedProductFeed.csv` produces typed product objects with all 38 columns correctly mapped (including embedded JSON fields parsed out)
+  2. Cleaning removes test/placeholder products, normalizes colors, sanitizes titles, and trims whitespace -- producing a filtered dataset of only real products
+  3. Image URL pre-flight check runs HEAD requests against all product image URLs, reporting which are reachable, and downloads reachable images to a local cache
+  4. Shared TypeScript types and Zod schemas for `Product` and `EnrichedFields` are defined and importable by both enrichment scripts and frontend
+**Plans**: TBD
+
+Plans:
+- [ ] 01-01: TBD
+- [ ] 01-02: TBD
+
+### Phase 2: Enrichment Engine
+**Goal**: All 4 enrichment tools process the full product dataset through a resilient batch runner, producing one enriched CSV per tool with metadata tracking
+**Depends on**: Phase 1
+**Requirements**: ENRC-01, ENRC-02, ENRC-03, ENRC-04, ENRC-05, ENRC-06, PIPE-03, PIPE-04, PIPE-05
+**Success Criteria** (what must be TRUE):
+  1. Each of the 4 adapters (Claude, Gemini, FireCrawl, Perplexity) implements the shared `EnrichmentAdapter` interface and fills the same 6 target fields (description_eng, season, year, collection, gtin, dimensions)
+  2. LLM adapters (Claude, Gemini) send product images alongside text data when images are available
+  3. Running the batch CLI against the full dataset produces one enriched CSV per tool, with each row containing original identifiers plus enriched fields plus enrichment metadata (status, fields enriched, errors)
+  4. Killing the batch process mid-run and restarting it resumes from the last checkpoint without re-processing already-completed products or wasting API credits
+  5. A run summary report is generated showing per-tool statistics (products processed, fields filled, errors encountered)
+**Plans**: TBD
+
+Plans:
+- [ ] 02-01: TBD
+- [ ] 02-02: TBD
+- [ ] 02-03: TBD
+
+### Phase 3: Core Comparison UI
+**Goal**: The client can browse products, view side-by-side enrichment results from all tools, visually see what changed, filter the dataset, and rate each tool's quality per product
+**Depends on**: Phase 1 (for types and schemas; can use mock CSVs until Phase 2 completes)
+**Requirements**: UI-01, UI-02, UI-03, UI-04, UI-05, UI-06, UI-07
+**Success Criteria** (what must be TRUE):
+  1. User can browse all products in a navigable list and select any product to view its detailed comparison
+  2. Selected product shows one card per enrichment tool side-by-side, each displaying the tool's enriched data for that product
+  3. Enriched fields are visually distinguished from original data (color highlighting: green for enriched, gray for unchanged, amber for partially filled)
+  4. Product images from feed URLs display on each card, and filtering by brand, category, department, and enrichment completeness narrows the product list
+  5. User can rate each tool's output quality (1-5 stars) per product, and those scores persist in localStorage across page refreshes
+**Plans**: TBD
+
+Plans:
+- [ ] 03-01: TBD
+- [ ] 03-02: TBD
+- [ ] 03-03: TBD
+
+### Phase 4: Analysis and Reporting
+**Goal**: The client can see aggregate results, understand which tool wins overall and per-field, configure importance weights, and export everything for their team
+**Depends on**: Phase 3
+**Requirements**: UI-08, UI-09, UI-10, UI-11, UI-12
+**Success Criteria** (what must be TRUE):
+  1. Aggregate dashboard displays overall scores and rankings per tool, answering "which tool wins?" at a glance
+  2. Per-field winner analysis shows which tool performs best at each of the 6 enrichment fields (e.g., "Claude wins on descriptions, FireCrawl wins on GTIN")
+  3. User can configure field importance weights (e.g., description matters more than dimensions) and see weighted quality scores update accordingly
+  4. Completeness metrics show fill rate per tool per field, making it clear which tools leave gaps
+  5. User can export all scoring results and analysis as a downloadable CSV for sharing with their team
+**Plans**: TBD
+
+Plans:
+- [ ] 04-01: TBD
+- [ ] 04-02: TBD
+
+## Progress
+
+**Execution Order:**
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 1. Data Foundation | 0/0 | Not started | - |
+| 2. Enrichment Engine | 0/0 | Not started | - |
+| 3. Core Comparison UI | 0/0 | Not started | - |
+| 4. Analysis and Reporting | 0/0 | Not started | - |
+
+---
+*Roadmap created: 2026-03-13*
+*Last updated: 2026-03-13*

@@ -55,7 +55,7 @@
 
 | Feature | Reason |
 |---------|--------|
-| Describely adapter | No public API — SaaS-only with manual CSV upload |
+| Describely adapter | No public API -- SaaS-only with manual CSV upload |
 | Database integration | Standalone evaluation project, not production pipeline |
 | Shopify sync | No publishing needed, just comparison |
 | Image enrichment (finding better images) | Focus is on data field enrichment |
@@ -67,36 +67,36 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PIPE-01 | — | Pending |
-| PIPE-02 | — | Pending |
-| PIPE-03 | — | Pending |
-| PIPE-04 | — | Pending |
-| PIPE-05 | — | Pending |
-| PIPE-06 | — | Pending |
-| ENRC-01 | — | Pending |
-| ENRC-02 | — | Pending |
-| ENRC-03 | — | Pending |
-| ENRC-04 | — | Pending |
-| ENRC-05 | — | Pending |
-| ENRC-06 | — | Pending |
-| UI-01 | — | Pending |
-| UI-02 | — | Pending |
-| UI-03 | — | Pending |
-| UI-04 | — | Pending |
-| UI-05 | — | Pending |
-| UI-06 | — | Pending |
-| UI-07 | — | Pending |
-| UI-08 | — | Pending |
-| UI-09 | — | Pending |
-| UI-10 | — | Pending |
-| UI-11 | — | Pending |
-| UI-12 | — | Pending |
+| PIPE-01 | Phase 1 | Pending |
+| PIPE-06 | Phase 1 | Pending |
+| PIPE-02 | Phase 1 | Pending |
+| PIPE-03 | Phase 2 | Pending |
+| PIPE-04 | Phase 2 | Pending |
+| PIPE-05 | Phase 2 | Pending |
+| ENRC-01 | Phase 2 | Pending |
+| ENRC-02 | Phase 2 | Pending |
+| ENRC-03 | Phase 2 | Pending |
+| ENRC-04 | Phase 2 | Pending |
+| ENRC-05 | Phase 2 | Pending |
+| ENRC-06 | Phase 2 | Pending |
+| UI-01 | Phase 3 | Pending |
+| UI-02 | Phase 3 | Pending |
+| UI-03 | Phase 3 | Pending |
+| UI-04 | Phase 3 | Pending |
+| UI-05 | Phase 3 | Pending |
+| UI-06 | Phase 3 | Pending |
+| UI-07 | Phase 3 | Pending |
+| UI-08 | Phase 4 | Pending |
+| UI-09 | Phase 4 | Pending |
+| UI-10 | Phase 4 | Pending |
+| UI-11 | Phase 4 | Pending |
+| UI-12 | Phase 4 | Pending |
 
 **Coverage:**
 - v1 requirements: 24 total
-- Mapped to phases: 0
-- Unmapped: 24 ⚠️
+- Mapped to phases: 24
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-13*
-*Last updated: 2026-03-13 after initial definition*
+*Last updated: 2026-03-13 after roadmap creation*
