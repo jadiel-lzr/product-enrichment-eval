@@ -4,10 +4,11 @@ import type { Product } from '../../types/product.js'
 // Mock the Anthropic SDK
 vi.mock('@anthropic-ai/sdk', () => {
   const mockCreate = vi.fn()
+  class MockAnthropic {
+    messages = { create: mockCreate }
+  }
   return {
-    default: vi.fn(() => ({
-      messages: { create: mockCreate },
-    })),
+    default: MockAnthropic,
     __mockCreate: mockCreate,
   }
 })
