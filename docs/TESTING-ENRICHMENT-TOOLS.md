@@ -51,41 +51,29 @@ npm run parse-and-clean
 npm run cache-images
 ```
 
-## 3. Set the Required API Key
+## 3. Set the Required API Keys
 
-Use only the key for the tool you want to test.
-
-### Claude
+The script auto-loads `enrichment/.env` if it exists. Copy the example and fill in your keys:
 
 ```bash
-export ANTHROPIC_API_KEY="your-key-here"
+cp enrichment/.env.example enrichment/.env
 ```
 
-### Gemini
+Then edit `enrichment/.env` with the keys for the tools you want to test:
 
-```bash
-export GOOGLE_GENAI_API_KEY="your-key-here"
+```env
+ANTHROPIC_API_KEY=your-key-here
+GOOGLE_GENAI_API_KEY=your-key-here
+FIRECRAWL_API_KEY=your-key-here
+PERPLEXITY_API_KEY=your-key-here
+
+# Optional model overrides
+CLAUDE_MODEL=claude-haiku-4-5-20250415
+GEMINI_MODEL=gemini-2.5-flash
+PERPLEXITY_MODEL=sonar-pro
 ```
 
-### FireCrawl
-
-```bash
-export FIRECRAWL_API_KEY="your-key-here"
-```
-
-### Perplexity
-
-```bash
-export PERPLEXITY_API_KEY="your-key-here"
-```
-
-Optional model overrides:
-
-```bash
-export CLAUDE_MODEL="claude-haiku-4-5-20250415"
-export GEMINI_MODEL="gemini-2.5-flash"
-export PERPLEXITY_MODEL="sonar-pro"
-```
+You only need the key for the tool you plan to test. Alternatively, you can still export keys directly in your shell if you prefer.
 
 ## 4. Run the Safe Local Checks First
 
@@ -128,6 +116,13 @@ This matters because the runner supports resume. If the checkpoint exists, it wi
 ## 6. Run a Single Tool
 
 Testing one tool at a time is the right starting point. It is cheaper, easier to debug, and isolates provider-specific failures.
+
+Use `--limit N` to process only the first N products. This is useful for quick smoke tests without burning through API credits:
+
+```bash
+cd /Users/jadieldossantos/Developer/Lazer/product-enrichment-eval/enrichment
+npx tsx src/scripts/enrich.ts --tool claude --limit 5
+```
 
 ### Claude
 
@@ -297,21 +292,25 @@ If you want the shortest path with the least waste:
 
 ```bash
 cd /Users/jadieldossantos/Developer/Lazer/product-enrichment-eval/enrichment
+
+# Setup
+cp .env.example .env   # then fill in your API keys
+npm install
+
+# Local checks (free)
 npx vitest run --reporter=verbose
 npx tsc --noEmit
 npx tsx src/scripts/enrich.ts
 
-export ANTHROPIC_API_KEY="your-key-here"
+# Quick smoke test (limit to 5 products)
+npx tsx src/scripts/enrich.ts --tool claude --limit 5
+
+# Full single-tool runs
 npx tsx src/scripts/enrich.ts --tool claude
-
-export GOOGLE_GENAI_API_KEY="your-key-here"
 npx tsx src/scripts/enrich.ts --tool gemini
-
-export FIRECRAWL_API_KEY="your-key-here"
 npx tsx src/scripts/enrich.ts --tool firecrawl
-
-export PERPLEXITY_API_KEY="your-key-here"
 npx tsx src/scripts/enrich.ts --tool perplexity
 
+# All tools
 npx tsx src/scripts/enrich.ts --tool all
 ```
