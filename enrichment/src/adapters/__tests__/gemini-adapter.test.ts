@@ -167,7 +167,7 @@ describe('Gemini Adapter', () => {
     const callArgs = mockGenerateContent.mock.calls[0][0]
     expect(callArgs.config).toBeDefined()
     expect(callArgs.config.responseMimeType).toBe('application/json')
-    expect(callArgs.config.responseSchema).toBeDefined()
+    expect(callArgs.config.responseJsonSchema).toBeDefined()
   })
 
   it('enrich() converts Zod schema to JSON Schema via zod-to-json-schema for responseSchema', async () => {
@@ -179,7 +179,7 @@ describe('Gemini Adapter', () => {
     await adapter.enrich(SAMPLE_PRODUCT)
 
     const callArgs = mockGenerateContent.mock.calls[0][0]
-    const schema = callArgs.config.responseSchema
+    const schema = callArgs.config.responseJsonSchema
 
     // JSON Schema should have type "object" and properties matching our schema
     expect(schema.type).toBe('object')
