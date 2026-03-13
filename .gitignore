@@ -6,3 +6,4 @@ dist/
 .claude/
 data/images/
 data/image-manifest.json
+data/enriched-*.csv
