@@ -4,6 +4,7 @@ import type { Product } from '@/types/enrichment'
 import {
   CORE_ENRICHMENT_FIELDS,
   TOOL_NAMES,
+  type ScoreTrack,
   type ToolEnrichment,
   type ToolName,
 } from '@/types/enrichment'
@@ -77,6 +78,28 @@ function deriveEnrichmentStatus(
   return 'failed'
 }
 
+function parseAccuracyScore(row: Record<string, string>): number | undefined {
+  const rawScore =
+    row['_accuracy_score']?.trim() ||
+    row['_enrichment_accuracy_score']?.trim() ||
+    ''
+
+  if (!rawScore) {
+    return undefined
+  }
+
+  const accuracyScore = Number(rawScore)
+  if (!Number.isFinite(accuracyScore)) {
+    return undefined
+  }
+
+  return accuracyScore
+}
+
+function deriveScoreTrack(accuracyScore: number | undefined): ScoreTrack {
+  return typeof accuracyScore === 'number' ? 'confidence' : 'no-confidence'
+}
+
 function buildToolEnrichment(
   row: Record<string, string>,
   tool: ToolName,
@@ -84,8 +107,7 @@ function buildToolEnrichment(
   const sku = row['sku'] ?? ''
   const status = deriveEnrichmentStatus(row)
   const error = row['_enrichment_error'] || undefined
-  const rawScore = row['_accuracy_score']
-  const accuracyScore = rawScore ? Number(rawScore) : undefined
+  const accuracyScore = parseAccuracyScore(row)
 
   const enrichedValues: Record<string, string> = {}
   const originalValues: Record<string, string> = {}
@@ -106,9 +128,8 @@ function buildToolEnrichment(
     tool,
     status,
     error,
-    accuracyScore: accuracyScore && !Number.isNaN(accuracyScore)
-      ? accuracyScore
-      : undefined,
+    accuracyScore,
+    scoreTrack: deriveScoreTrack(accuracyScore),
     fieldsEnriched,
     totalFields: CORE_ENRICHMENT_FIELDS.length,
     enrichedValues,

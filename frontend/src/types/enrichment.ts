@@ -34,6 +34,8 @@ export const CORE_ENRICHMENT_FIELDS = [
 
 export type CoreEnrichmentField = (typeof CORE_ENRICHMENT_FIELDS)[number]
 
+export type ScoreTrack = 'confidence' | 'no-confidence'
+
 // Field display labels
 export const FIELD_LABELS: Record<CoreEnrichmentField, string> = {
   description_eng: 'Description (EN)',
@@ -54,6 +56,7 @@ export interface ToolEnrichment {
   readonly status: 'success' | 'partial' | 'failed'
   readonly error?: string
   readonly accuracyScore?: number
+  readonly scoreTrack: ScoreTrack
   readonly fieldsEnriched: number
   readonly totalFields: number
   readonly enrichedValues: Readonly<Record<string, string>>
