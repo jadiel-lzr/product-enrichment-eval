@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit",
     "parse-and-clean": "tsx src/scripts/parse-and-clean.ts",
     "cache-images": "tsx src/scripts/cache-images.ts",
-    "enrich": "tsx src/scripts/enrich.ts"
+    "enrich": "tsx src/scripts/enrich.ts",
+    "enrich:llm": "tsx src/scripts/enrich.ts --tool all-llm"
   },
   "keywords": [],
   "author": "",

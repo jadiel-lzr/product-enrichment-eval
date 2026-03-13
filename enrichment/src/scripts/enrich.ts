@@ -12,7 +12,9 @@ import { DEFAULT_CONCURRENCY, runBatch } from '../batch/runner.js'
 import { parseProductCSV } from '../parsers/csv-reader.js'
 
 type ToolName = 'claude' | 'gemini' | 'firecrawl' | 'perplexity'
-type ToolOption = ToolName | 'all'
+type ToolOption = ToolName | 'all' | 'all-llm'
+
+const LLM_TOOLS: readonly ToolName[] = ['claude', 'gemini', 'perplexity']
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(scriptDir, '../../../')
@@ -44,7 +46,7 @@ async function main(): Promise<void> {
     return
   }
 
-  if (!(tool in TOOL_FACTORIES) && tool !== 'all') {
+  if (!(tool in TOOL_FACTORIES) && tool !== 'all' && tool !== 'all-llm') {
     console.error(`Invalid tool: ${tool}`)
     printUsage()
     process.exitCode = 1
@@ -66,7 +68,12 @@ async function main(): Promise<void> {
     console.log(`Limiting to ${products.length} of ${allProducts.length} products`)
   }
 
-  const tools = tool === 'all' ? (Object.keys(TOOL_FACTORIES) as ToolName[]) : [tool]
+  const tools =
+    tool === 'all'
+      ? (Object.keys(TOOL_FACTORIES) as ToolName[])
+      : tool === 'all-llm'
+        ? [...LLM_TOOLS]
+        : [tool]
 
   for (const toolName of tools) {
     const adapter = TOOL_FACTORIES[toolName]()
@@ -113,7 +120,7 @@ function parseLimitArg(args: readonly string[]): number | undefined {
 
 function printUsage(): void {
   const scriptName = 'npx tsx src/scripts/enrich.ts'
-  console.error(`Usage: ${scriptName} --tool claude|gemini|firecrawl|perplexity|all [--limit N]`)
+  console.error(`Usage: ${scriptName} --tool claude|gemini|firecrawl|perplexity|all|all-llm [--limit N]`)
 }
 
 main().catch((error) => {
