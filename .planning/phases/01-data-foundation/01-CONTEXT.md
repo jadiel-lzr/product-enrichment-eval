@@ -72,10 +72,11 @@ Parse, clean, and validate the source CSV (`originalUnEnrichedProductFeed.csv`, 
 
 ### Integration Points
 - `data/base.csv` → consumed by all enrichment adapters in Phase 2
-- `data/images/` → consumed by LLM adapters (Claude, Gemini) in Phase 2 for vision input
-- `data/image-manifest.json` → consumed by Phase 2 to know which images are available per product
+- `data/images/` → consumed by LLM adapters (Claude, Gemini) in Phase 2 for vision input AND by Phase 5 SerpAPI URL Discovery for visual search
+- `data/image-manifest.json` → consumed by Phase 2 to know which images are available per product AND by Phase 5 for selecting images to send to Google Lens
 - Shared TypeScript types (`Product`, `EnrichedFields`, `ErrorEntry`, `SizeEntry`) → imported by both enrichment scripts and frontend
 - Zod schemas → used for validation at CSV parse boundary and by frontend for runtime safety
+- Phase 5 (SerpAPI) depends on this phase's image cache — `data/images/` and `data/image-manifest.json` are the handoff point
 
 </code_context>
 
