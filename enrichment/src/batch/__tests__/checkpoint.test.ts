@@ -69,19 +69,31 @@ describe('checkpoint', () => {
   })
 
   describe('getCompletedSkus', () => {
-    it('returns Set of completed SKU strings', () => {
+    it('returns success and partial SKUs but excludes failed ones', () => {
       const result = getCompletedSkus(sampleCheckpoint)
 
       expect(result).toBeInstanceOf(Set)
-      expect(result.size).toBe(3)
+      expect(result.size).toBe(2)
       expect(result.has('SKU001')).toBe(true)
       expect(result.has('SKU002')).toBe(true)
-      expect(result.has('SKU003')).toBe(true)
+      expect(result.has('SKU003')).toBe(false)
     })
 
     it('returns empty Set for undefined checkpoint', () => {
       const result = getCompletedSkus(undefined)
       expect(result).toBeInstanceOf(Set)
+      expect(result.size).toBe(0)
+    })
+
+    it('returns empty Set when all entries are failed', () => {
+      const allFailed: CheckpointData = {
+        ...sampleCheckpoint,
+        completed: [
+          { sku: 'SKU001', status: 'failed' },
+          { sku: 'SKU002', status: 'failed' },
+        ],
+      }
+      const result = getCompletedSkus(allFailed)
       expect(result.size).toBe(0)
     })
   })

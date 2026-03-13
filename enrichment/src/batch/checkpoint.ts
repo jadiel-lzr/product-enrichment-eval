@@ -44,5 +44,9 @@ export function getCompletedSkus(
   if (!checkpoint) {
     return new Set()
   }
-  return new Set(checkpoint.completed.map((c) => c.sku))
+  return new Set(
+    checkpoint.completed
+      .filter((c) => c.status !== 'failed')
+      .map((c) => c.sku),
+  )
 }
