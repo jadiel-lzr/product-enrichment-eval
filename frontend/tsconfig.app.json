@@ -29,5 +29,6 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["src", "../enrichment/src/types"]
+  "include": ["src", "../enrichment/src/types"],
+  "exclude": ["../**/__tests__/**", "../**/*.test.ts"]
 }
