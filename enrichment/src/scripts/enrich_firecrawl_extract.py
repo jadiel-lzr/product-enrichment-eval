@@ -80,8 +80,10 @@ ENRICHMENT_TARGET_FIELDS = [
 
 FIELD_DESCRIPTIONS = {
     "title": (
-        "Product name or title. Check: visible heading/title, <title> tag, "
-        "og:title meta tag, JSON-LD 'name' field. Return null if not found."
+        "Product name or title in English. Check: visible heading/title, <title> tag, "
+        "og:title meta tag, JSON-LD 'name' field. "
+        "If the title is in a non-English language, translate it to English. "
+        "Return null if not found."
     ),
     "description_eng": (
         "Full product description in English focusing ONLY on the product itself. "
