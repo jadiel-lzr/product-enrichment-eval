@@ -21,6 +21,7 @@ export const TOOL_DISPLAY_NAMES: Record<ToolName, string> = {
 
 // Core enrichment target fields (matches ENRICHMENT_TARGET_FIELDS from shared schema)
 export const CORE_ENRICHMENT_FIELDS = [
+  'title',
   'description_eng',
   'season',
   'year',
@@ -40,6 +41,7 @@ export type ScoreTrack = 'confidence' | 'no-confidence'
 
 // Field display labels
 export const FIELD_LABELS: Record<CoreEnrichmentField, string> = {
+  title: 'Title',
   description_eng: 'Description (EN)',
   season: 'Season',
   year: 'Year',

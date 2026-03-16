@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 export const ENRICHMENT_TARGET_FIELDS = [
+  'title',
   'description_eng',
   'season',
   'year',
@@ -16,6 +17,7 @@ export const ENRICHMENT_TARGET_FIELDS = [
 
 export const EnrichedFieldsSchema = z
   .object({
+    title: z.string().optional(),
     description_eng: z.string().optional(),
     season: z.string().optional(),
     year: z.string().optional(),

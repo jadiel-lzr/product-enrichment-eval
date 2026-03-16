@@ -57,6 +57,8 @@ function getExistingTargetValue(
   field: TargetField,
 ): string | undefined {
   switch (field) {
+    case 'title':
+      return getExistingString(product, 'title')
     case 'description_eng':
       return getExistingString(product, 'description_eng')
     case 'season':

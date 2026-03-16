@@ -32,6 +32,7 @@ export const ANALYSIS_WEIGHT_PRESETS: readonly WeightPreset[] = [
     label: 'Balanced',
     description: 'Even weighting across the core enrichment fields.',
     weights: createWeights({
+      title: 1,
       description_eng: 1,
       season: 1,
       year: 1,
@@ -50,6 +51,7 @@ export const ANALYSIS_WEIGHT_PRESETS: readonly WeightPreset[] = [
     label: 'Accuracy First',
     description: 'Prioritize narrative and compliance-sensitive fields.',
     weights: createWeights({
+      title: 1.4,
       description_eng: 1.4,
       season: 0.8,
       year: 0.8,
@@ -68,6 +70,7 @@ export const ANALYSIS_WEIGHT_PRESETS: readonly WeightPreset[] = [
     label: 'Completeness First',
     description: 'Emphasize broad field coverage for catalog readiness.',
     weights: createWeights({
+      title: 1.1,
       description_eng: 1,
       season: 1.2,
       year: 1.2,

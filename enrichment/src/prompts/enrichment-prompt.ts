@@ -2,7 +2,7 @@ import type { Product } from '../types/product.js'
 import { ENRICHMENT_TARGET_FIELDS } from '../types/enriched.js'
 import { buildLensContextLines } from '../lens/extractor.js'
 
-const FACTUAL_FIELDS = ['gtin', 'dimensions', 'year', 'weight'] as const
+const FACTUAL_FIELDS = ['title', 'gtin', 'dimensions', 'year', 'weight'] as const
 const GENERATIVE_FIELDS = [
   'description_eng',
   'season',
@@ -15,6 +15,7 @@ const GENERATIVE_FIELDS = [
 
 function buildExistingContext(product: Product): string {
   const contextEntries: readonly string[] = [
+    product.title ? `- title is currently "${product.title}" -- this may be generic (brand + category), find the actual product name` : '',
     product.season ? `- season is currently "${product.season}" -- confirm or improve` : '',
     product.year ? `- year is currently "${product.year}" -- confirm or improve` : '',
     product.collection ? `- collection is currently "${product.collection}" -- confirm or improve` : '',
@@ -43,7 +44,7 @@ function buildLensContext(product: Product): string {
 The following products were identified as visual matches:
 ${lines.join('\n')}
 
-Use these to verify or infer: description, materials, color, made_in, collection, season.
+Use these to verify or infer: title (actual product name), description, materials, color, made_in, collection, season.
 
 `
 }
@@ -67,7 +68,7 @@ export function buildEnrichmentPrompt(product: Product): string {
 
 ${lensContext}## Target Fields
 
-Fill each of the following 11 fields. Return a JSON object with exactly these keys:
+Fill each of the following 12 fields. Return a JSON object with exactly these keys:
 
 ${ENRICHMENT_TARGET_FIELDS.map((f) => `- \`${f}\``).join('\n')}
 - \`accuracy_score\` (integer 1-10): your overall confidence in this enrichment
@@ -78,9 +79,21 @@ ${ENRICHMENT_TARGET_FIELDS.map((f) => `- \`${f}\``).join('\n')}
 
 **Generative fields (${GENERATIVE_FIELDS.join(', ')}):** Always attempt to fill these fields, even with moderate confidence. Use context clues from the product identity, images, and existing values.
 
-## Description Tone
+## Title Guidelines
 
-Write \`description_eng\` as luxury e-commerce copy, 2-3 sentences, professional style (think NET-A-PORTER / SSENSE -- concise, elegant, highlights materials and design).
+Write \`title\` as the actual product name, not a generic "Brand + Category" label. Include the model name, style name, and key identifying details. Generic titles hurt SEO and get flagged as duplicates by search engines.
+
+Bad: "Acne Skirts"
+Good: "Macaria Distressed Denim Miniskirt"
+
+Use the product identity, images, and visual match context to find the real product name. If you cannot determine the specific product name with confidence, leave it blank.
+
+## Description Guidelines
+
+Write \`description_eng\` as a factual product summary, 2-3 sentences. Include only verifiable details present in the product data, images, or visual match context: materials, construction, design features, intended use. Do not invent attributes, marketing claims, or subjective descriptions. Avoid superlatives and lifestyle language.
+
+Bad: "Perfect for a Scandinavian aesthetic, this exquisite piece elevates any wardrobe."
+Good: "Constructed from 100% wool felt with a grosgrain ribbon trim. Features a wide brim and packable silhouette."
 
 ## Color Guidelines
 
@@ -92,11 +105,12 @@ Write \`additional_info\` as a concise summary of supplementary product details 
 
 ## Output Format
 
-Return ONLY a valid JSON object with the 11 target fields plus \`accuracy_score\` (integer 1-10). No markdown, no explanation, no wrapping.
+Return ONLY a valid JSON object with the 12 target fields plus \`accuracy_score\` (integer 1-10). No markdown, no explanation, no wrapping.
 
 Example structure:
 \`\`\`json
 {
+  "title": "...",
   "description_eng": "...",
   "season": "...",
   "year": "...",
