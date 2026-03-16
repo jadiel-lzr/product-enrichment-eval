@@ -83,6 +83,7 @@ FIELD_DESCRIPTIONS = {
         "EXCLUDE all retailer/marketplace marketing: store names, discount percentages, "
         "sale events, pricing, shipping info, promotional language (e.g., 'up to X% off', "
         "'exclusive sale', 'unbeatable prices', 'free shipping'). "
+        "EXCLUDE 'Made in [country]' info — that belongs in the made_in field, not here. "
         "Only include text that describes the product's features, design, fit, or craftsmanship. "
         "Return null if only marketing text is found with no actual product description."
     ),
@@ -132,9 +133,13 @@ FIELD_DESCRIPTIONS = {
     ),
     "additional_info": (
         "Any supplementary product details not covered by other fields "
-        "(e.g., care instructions, special features, fit notes). "
+        "(e.g., care instructions, special features, fit notes, design details). "
         "Check: product details section, care labels, feature lists. "
-        "Return null if not found."
+        "EXCLUDE all retailer/logistics info: available sizes, shipping costs, "
+        "delivery estimates, return/exchange policies, stock availability, "
+        "pricing, and any promotional or marketplace-specific text. "
+        "Only include information intrinsic to the product itself. "
+        "Return null if only retailer info is found with no actual product details."
     ),
 }
 
@@ -359,8 +364,12 @@ def main() -> None:
             brand = row.get("brand", "").strip()
             best_links_raw = row.get("best_product_links", "").strip()
 
-            # Find empty enrichable fields
-            empty_fields = [f for f in ENRICHMENT_TARGET_FIELDS if not row.get(f, "").strip()]
+            # Find empty enrichable fields + always re-extract title
+            ALWAYS_EXTRACT = {"title", "made_in"}
+            empty_fields = [
+                f for f in ENRICHMENT_TARGET_FIELDS
+                if not row.get(f, "").strip() or f in ALWAYS_EXTRACT
+            ]
 
             prefix = f"[{i}/{len(pending_rows)}] SKU {sku}"
 
