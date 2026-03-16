@@ -22,14 +22,15 @@ Product {
 
 ---
 
-## Target Fields (11 fields)
+## Target Fields (12 fields)
 
-Every tool attempts to fill the same 11 fields, split by confidence strategy:
+Every tool attempts to fill the same 12 fields, split by confidence strategy:
 
 **Factual fields** (leave blank if uncertain — wrong data is worse than missing):
 
 | Field | Description | Example |
 |-------|-------------|---------|
+| `title` | Actual product name (not brand + category) | `"Macaria Distressed Denim Miniskirt"` |
 | `gtin` | Global Trade Item Number (barcode) | `"8057963952335"` |
 | `dimensions` | Physical dimensions | `"30 x 20 x 10 cm"` |
 | `year` | Product year | `"2023"` |
@@ -49,7 +50,7 @@ Every tool attempts to fill the same 11 fields, split by confidence strategy:
 
 Each enrichment also returns an `accuracy_score` (integer 1-10) representing overall confidence.
 
-Fill rate = count of non-empty filled fields / 11.
+Fill rate = count of non-empty filled fields / 12.
 
 ---
 
@@ -59,9 +60,9 @@ Every tool returns an `EnrichmentResult`:
 
 ```
 EnrichmentResult {
-  fields: { description_eng, season, year, collection, gtin,
-            dimensions, made_in, materials, weight, color,
-            additional_info },
+  fields: { title, description_eng, season, year, collection,
+            gtin, dimensions, made_in, materials, weight,
+            color, additional_info },
   status: 'success' | 'partial' | 'failed',
   fillRate: 0-1,
   enrichedFields: string[],
@@ -88,7 +89,7 @@ Product + Images
 │    • Product identity       │
 │    • Existing field values  │
 │    • Lens match context     │  ← up to 5 brand match titles/sources
-│    • 11 target fields       │
+│    • 12 target fields       │
 │    • Confidence strategy    │
 │                             │
 │ 3. Send to Claude API:      │
@@ -128,7 +129,7 @@ Product + Images
 │    • Product identity       │
 │    • Existing field values  │
 │    • Lens match context     │  ← same as Claude
-│    • 11 target fields       │
+│    • 12 target fields       │
 │    • Confidence strategy    │
 │                             │
 │ 3. Send to Gemini API:      │
@@ -154,31 +155,34 @@ EnrichmentResult (with accuracy_score)
 
 ---
 
-## Perplexity (Search-Augmented LLM)
+## GPT (Vision LLM)
 
 ```
-Product (no images)
+Product + Images
     │
     ▼
 ┌─────────────────────────────┐
-│ 1. Build enrichment prompt: │
+│ 1. Load cached product      │
+│    images (base64)          │
+│                             │
+│ 2. Build enrichment prompt: │
 │    • Product identity       │
 │    • Existing field values  │
-│    • Lens match context     │  ← same prompt as vision LLMs
-│    • 11 target fields       │
+│    • Lens match context     │  ← same as Claude/Gemini
+│    • 12 target fields       │
 │    • Confidence strategy    │
 │                             │
-│ 2. Send to Perplexity API:  │
-│    • Text prompt only       │
+│ 3. Send to OpenAI API:      │
+│    • Images as image_url    │
+│      parts (base64)         │
+│    • Text prompt            │
 │    • JSON schema format     │
-│    (Perplexity searches     │
-│     the web internally)     │
 │                             │
-│ 3. Parse JSON response      │
+│ 4. Parse JSON response      │
 │    (with regex fallback     │
 │     for free-text)          │
-│ 4. Validate with Zod        │
-│ 5. Compute fill rate        │
+│ 5. Validate with Zod        │
+│ 6. Compute fill rate        │
 └─────────────────────────────┘
     │
     ▼
@@ -186,10 +190,10 @@ EnrichmentResult (with accuracy_score)
 ```
 
 **Key details:**
-- SDK: `openai` (OpenAI-compatible API, or via LiteLLM)
-- Default model: `sonar-pro`
-- No image support — relies on product metadata + web search
-- Perplexity internally searches the web before generating
+- SDK: `openai` (native, or via LiteLLM)
+- Default model: `gpt-5.2`
+- Images as OpenAI-compatible `image_url` parts with base64 data URIs
+- Structured output via `json_schema` response format
 - Has regex-based JSON extraction fallback for free-text responses
 - Concurrency: 3
 

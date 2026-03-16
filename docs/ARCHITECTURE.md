@@ -24,7 +24,7 @@ product-enrichment-eval/
 │       │   ├── claude-adapter.ts
 │       │   ├── gemini-adapter.ts
 │       │   ├── firecrawl-adapter.ts
-│       │   ├── perplexity-adapter.ts
+│       │   ├── gpt-adapter.ts
 │       │   ├── litellm.ts      # LiteLLM proxy routing
 │       │   └── types.ts        # Shared adapter interfaces
 │       ├── batch/              # Batch processing engine
@@ -87,12 +87,13 @@ product-enrichment-eval/
 
 ## Enrichment Target Fields
 
-The pipeline enriches **11 fields** per product, categorized by confidence strategy:
+The pipeline enriches **12 fields** per product, categorized by confidence strategy:
 
 ### Factual Fields (leave blank if uncertain)
 
 | Field | Description |
 |-------|-------------|
+| `title` | Actual product name (not generic brand + category) |
 | `gtin` | Global Trade Item Number (barcode) |
 | `dimensions` | Physical dimensions (e.g., "30x20x10cm") |
 | `year` | Product year |
@@ -102,7 +103,7 @@ The pipeline enriches **11 fields** per product, categorized by confidence strat
 
 | Field | Description |
 |-------|-------------|
-| `description_eng` | Luxury e-commerce copy, 2-3 sentences (NET-A-PORTER style) |
+| `description_eng` | Factual product summary, 2-3 sentences (no marketing language) |
 | `season` | Season name (e.g., "Fall Winter 2023") |
 | `collection` | Collection name |
 | `materials` | Material composition |
@@ -158,33 +159,32 @@ Each enrichment also returns an `accuracy_score` (integer 1-10) representing ove
 6. If no results → falls back to Google Shopping site-specific search
 7. Scrapes picked URL with JSON extraction targeting only missing fields
 
-### Perplexity (Search-Augmented LLM)
+### GPT (Vision LLM)
 
 | Property | Value |
 |----------|-------|
-| SDK | `openai` (compatible API) |
-| Default model | `sonar-pro` |
-| Model env var | `PERPLEXITY_MODEL` |
-| API key env var | `PERPLEXITY_API_KEY` |
-| Base URL | `https://api.perplexity.ai` (configurable via `PERPLEXITY_BASE_URL`) |
-| Supports images | No |
+| SDK | `openai` |
+| Default model | `gpt-5.2` |
+| Model env var | `GPT_MODEL` |
+| API key env var | `OPENAI_API_KEY` or `GPT_API_KEY` |
+| Base URL | `https://api.openai.com/v1` (configurable via `GPT_BASE_URL`) |
+| Supports images | Yes (OpenAI-compatible `image_url` parts with base64) |
 | Output format | `json_schema` response format |
 | Concurrency | 3 |
-| Special behavior | Regex-based JSON extraction fallback for free-text responses |
 
 ### LiteLLM Proxy (Optional)
 
-Claude, Gemini, and Perplexity can be routed through a LiteLLM proxy for cost optimization or centralized API management.
+Claude, Gemini, and GPT can be routed through a LiteLLM proxy for cost optimization or centralized API management.
 
 | Env var | Effect |
 |---------|--------|
 | `CLAUDE_BASE_URL` | Routes Claude through LiteLLM |
 | `GEMINI_BASE_URL` | Routes Gemini through LiteLLM |
-| `PERPLEXITY_BASE_URL` | Routes Perplexity through LiteLLM |
+| `GPT_BASE_URL` | Routes GPT through LiteLLM |
 | `LITELLM_BASE_URL` | Fallback for all tools |
 | `LITELLM_API_KEY` | API key for the proxy |
 
-When LiteLLM is active, adapters use the OpenAI SDK with the proxy's base URL instead of native SDKs. Image content is converted to OpenAI-compatible `image_url` parts with base64 data URIs. When using LiteLLM, prefix model names with the provider (e.g. `PERPLEXITY_MODEL=perplexity/sonar-pro`). Empty-string `*_BASE_URL` values are treated as unset and fall through to `LITELLM_BASE_URL`.
+When LiteLLM is active, adapters use the OpenAI SDK with the proxy's base URL instead of native SDKs. Image content is converted to OpenAI-compatible `image_url` parts with base64 data URIs. When using LiteLLM, prefix model names with the provider (e.g. `GPT_MODEL=openai/gpt-5.2`). Empty-string `*_BASE_URL` values are treated as unset and fall through to `LITELLM_BASE_URL`.
 
 ---
 
@@ -198,7 +198,7 @@ Create a `.env` file in `enrichment/` with API keys:
 ANTHROPIC_API_KEY=sk-ant-...
 GOOGLE_GENAI_API_KEY=AI...
 FIRECRAWL_API_KEY=fc-...
-PERPLEXITY_API_KEY=pplx-...
+OPENAI_API_KEY=sk-...
 ```
 
 ### Commands
@@ -222,12 +222,12 @@ npm run cache-images
 npx tsx src/scripts/enrich.ts --tool claude
 npx tsx src/scripts/enrich.ts --tool gemini
 npx tsx src/scripts/enrich.ts --tool firecrawl
-npx tsx src/scripts/enrich.ts --tool perplexity
+npx tsx src/scripts/enrich.ts --tool gpt
 
-# All tools (runs sequentially: claude → gemini → firecrawl → perplexity)
+# All tools (runs sequentially: claude → gemini → firecrawl → gpt)
 npx tsx src/scripts/enrich.ts --tool all
 
-# LLM tools only (claude → gemini → perplexity, skips firecrawl)
+# LLM tools only (claude → gemini → gpt, skips firecrawl)
 npm run enrich:llm
 
 # Limit to N products (useful for testing)
@@ -242,7 +242,7 @@ When using `--tool all`, tools run **sequentially** in this order:
 1. claude    (concurrency: 3)
 2. gemini    (concurrency: 5)
 3. firecrawl (concurrency: 2)
-4. perplexity (concurrency: 3)
+4. gpt        (concurrency: 3)
 ```
 
 Each tool fully completes before the next starts. Tools write to independent output files and checkpoints, so there is no data dependency between them.
@@ -308,7 +308,7 @@ The base CSV includes visual match data from SerpAPI Google Lens. Each product's
 Each match is an object with `title`, `link`, `source`, `thumbnail`, `price`, `rating`, `reviews`. Some products have `{"error": "..."}` instead of arrays (image URL was not reachable).
 
 **How lens data is used:**
-- **LLM tools (Claude, Gemini, Perplexity)**: Up to 5 brand match titles/sources are injected into the enrichment prompt as "Visual Match Context", giving the LLM strong signals for description, materials, color, and made_in.
+- **LLM tools (Claude, Gemini, GPT)**: Up to 5 brand match titles/sources are injected into the enrichment prompt as "Visual Match Context", giving the LLM strong signals for description, materials, color, and made_in.
 - **FireCrawl**: Brand match URLs are used as the highest-priority scraping targets, skipping the search step entirely. Stock photo domains (iStock, Getty, Shutterstock, etc.) are filtered out.
 
 Lens data passes through the pipeline as raw JSON strings via Zod's `.passthrough()` — no schema changes needed. The `enrichment/src/lens/` module handles parsing and filtering on demand.
@@ -318,7 +318,7 @@ Lens data passes through the pipeline as raw JSON strings via Zod's `.passthroug
 1. **Preflight** (`cache-images`): HEAD requests to check image URL reachability (10 concurrent, retry once)
 2. **Download**: Fetches reachable images to `data/images/{sku}_{index}.{ext}` (10 concurrent)
 3. **Manifest**: Writes `data/image-manifest.json` with status per image
-4. **At enrichment time**: Images resized to max 1024px edge, JPEG quality 85, sent as base64 to vision LLMs (Claude, Gemini)
+4. **At enrichment time**: Images resized to max 1024px edge, JPEG quality 85, sent as base64 to vision LLMs (Claude, Gemini, GPT)
 
 ### Output
 
@@ -355,17 +355,18 @@ Contains: total/success/partial/failed counts, average fill rate, per-field fill
 
 ## Enrichment Prompt
 
-The prompt sent to all LLM tools (Claude, Gemini, Perplexity) follows this structure:
+The prompt sent to all LLM tools (Claude, Gemini, GPT) follows this structure:
 
 1. **Product Identity** — Brand, Name, Model, Color, Category, Department
-2. **Existing Context** — Current field values marked "confirm or improve" (season, year, collection, made_in, materials, dimensions, gtin, color)
-3. **Visual Match Context** (when available) — Up to 5 Google Lens brand matches with title, source, and price. Instructs the LLM to use these to verify or infer description, materials, color, made_in, collection, season
-4. **Target Fields** — Lists all 11 fields + accuracy_score
-5. **Confidence Strategy** — Factual fields: leave blank if uncertain. Generative fields: always attempt
-6. **Description Tone** — Luxury e-commerce copy (NET-A-PORTER / SSENSE style)
-7. **Color Guidelines** — Normalize abbreviations, verify against images
-8. **Additional Info Guidelines** — Care instructions, design features, 1-2 sentences
-9. **Output Format** — Pure JSON, no markdown wrapping
+2. **Existing Context** — Current field values marked "confirm or improve" (title, season, year, collection, made_in, materials, dimensions, gtin, color)
+3. **Visual Match Context** (when available) — Up to 5 Google Lens brand matches with title, source, and price. Instructs the LLM to use these to verify or infer title, description, materials, color, made_in, collection, season
+4. **Target Fields** — Lists all 12 fields + accuracy_score
+5. **Confidence Strategy** — Factual fields (title, gtin, dimensions, year, weight): leave blank if uncertain. Generative fields: always attempt
+6. **Title Guidelines** — Must be the actual product name, not generic brand + category
+7. **Description Guidelines** — Factual product summary only, no marketing language or assumptions
+8. **Color Guidelines** — Normalize abbreviations, verify against images
+9. **Additional Info Guidelines** — Care instructions, design features, 1-2 sentences
+10. **Output Format** — Pure JSON, no markdown wrapping
 
 ---
 
@@ -435,7 +436,7 @@ Analysis scores are weighted by field importance:
 Products are split into two scoring tracks:
 
 - **Confidence track** — Products where the tool returned an `accuracy_score` (vision LLMs)
-- **No-confidence track** — Products without accuracy scores (FireCrawl, Perplexity)
+- **No-confidence track** — Products without accuracy scores (FireCrawl)
 
 This prevents unfair comparison between tools that self-report confidence and those that don't.
 
@@ -460,7 +461,7 @@ URL parameters persist selected product and filters across page loads (`?product
 | `ANTHROPIC_API_KEY` | Claude | Anthropic API key |
 | `GOOGLE_GENAI_API_KEY` | Gemini | Google AI API key |
 | `FIRECRAWL_API_KEY` | FireCrawl | FireCrawl API key |
-| `PERPLEXITY_API_KEY` | Perplexity | Perplexity API key |
+| `OPENAI_API_KEY` | GPT | OpenAI API key |
 
 ### Optional (model overrides)
 
@@ -468,7 +469,7 @@ URL parameters persist selected product and filters across page loads (`?product
 |----------|---------|-------------|
 | `CLAUDE_MODEL` | `claude-haiku-4-5-20250415` | Claude model ID |
 | `GEMINI_MODEL` | `gemini-2.5-flash` | Gemini model ID |
-| `PERPLEXITY_MODEL` | `sonar-pro` | Perplexity model ID |
+| `GPT_MODEL` | `gpt-5.2` | OpenAI GPT model ID |
 
 ### Optional (LiteLLM proxy)
 
@@ -476,17 +477,18 @@ URL parameters persist selected product and filters across page loads (`?product
 |----------|-------------|
 | `CLAUDE_BASE_URL` | LiteLLM proxy URL for Claude |
 | `GEMINI_BASE_URL` | LiteLLM proxy URL for Gemini |
-| `LITELLM_BASE_URL` | Fallback proxy URL for both |
+| `LITELLM_BASE_URL` | Fallback proxy URL for all tools |
 | `LITELLM_API_KEY` | Proxy API key |
 | `CLAUDE_API_KEY` | Alternative Claude key (checked before `ANTHROPIC_API_KEY`) |
 | `GEMINI_API_KEY` | Alternative Gemini key (checked before `GOOGLE_GENAI_API_KEY`) |
-| `PERPLEXITY_BASE_URL` | Override Perplexity endpoint |
+| `GPT_BASE_URL` | Override GPT endpoint |
+| `GPT_API_KEY` | Alternative GPT key (checked before `OPENAI_API_KEY`) |
 
 ### API Key Resolution Order
 
 **Claude:** `CLAUDE_API_KEY` → `LITELLM_API_KEY` → `ANTHROPIC_API_KEY`
 **Gemini:** `GEMINI_API_KEY` → `LITELLM_API_KEY` → `GOOGLE_GENAI_API_KEY`
-**Perplexity:** `PERPLEXITY_API_KEY` → `LITELLM_API_KEY`
+**GPT:** `OPENAI_API_KEY` → `GPT_API_KEY` → `LITELLM_API_KEY`
 
 ---
 
