@@ -15,7 +15,7 @@
     "enrich": "tsx src/scripts/enrich.ts",
     "enrich:llm": "tsx src/scripts/enrich.ts --tool all-llm",
     "pick-best-links": ".venv/bin/python src/lens/pick_best_links.py",
-    "pick-best-links:setup": "python3 -m venv .venv && .venv/bin/pip install aiohttp tqdm playwright && .venv/bin/playwright install chromium"
+    "python:setup": "python3 -m venv .venv && .venv/bin/pip install -r requirements.txt && .venv/bin/playwright install chromium"
   },
   "keywords": [],
   "author": "",
