@@ -12,3 +12,4 @@ data/reports/
 .DS_Store
 frontend/.npm-cache/
 .vscode/
+.venv/
