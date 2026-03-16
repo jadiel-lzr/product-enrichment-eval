@@ -80,6 +80,7 @@ const SAMPLE_PRODUCT: Product = {
 }
 
 const FULL_ENRICHMENT_RESPONSE = {
+  title: 'Carre 90 Silk Twill Scarf',
   description_eng: 'An exquisite silk scarf handcrafted in France.',
   season: 'Spring Summer 2024',
   year: '2024',
@@ -95,6 +96,7 @@ const FULL_ENRICHMENT_RESPONSE = {
 }
 
 const PARTIAL_ENRICHMENT_RESPONSE = {
+  title: 'Silk Scarf',
   description_eng: 'A beautiful silk scarf.',
   season: 'Spring Summer 2024',
   year: '',
@@ -229,7 +231,7 @@ describe('Gemini Adapter', () => {
     expect(result.enrichedFields).toContain('description_eng')
     expect(result.enrichedFields).toContain('made_in')
     expect(result.enrichedFields).toContain('materials')
-    expect(result.enrichedFields.length).toBe(11)
+    expect(result.enrichedFields.length).toBe(12)
     expect(result.fields.description_eng).toBe('An exquisite silk scarf handcrafted in France.')
   })
 

@@ -51,6 +51,7 @@ describe('buildEnrichmentPrompt', () => {
 
     expect(prompt).toContain('HELEN KAMINSKI')
     expect(prompt).toContain('Provence 12 Hat')
+    expect(prompt).toContain('title')
     expect(prompt).toContain('description_eng')
     expect(prompt).toContain('season')
     expect(prompt).toContain('year')
@@ -84,15 +85,26 @@ describe('buildEnrichmentPrompt', () => {
     expect(prompt).toMatch(/description_eng.*always attempt|always attempt.*fill|generative.*attempt/i)
   })
 
-  it('includes description tone instruction for luxury e-commerce', () => {
+  it('includes factual description guidelines without marketing language', () => {
     const product = makeProduct()
     const prompt = buildEnrichmentPrompt(product)
 
-    expect(prompt).toMatch(/luxury|NET-A-PORTER|SSENSE|e-commerce|professional/i)
+    expect(prompt).toMatch(/factual|verifiable/i)
     expect(prompt).toMatch(/2-3 sentences/i)
+    expect(prompt).not.toContain('NET-A-PORTER')
+    expect(prompt).not.toContain('SSENSE')
   })
 
-  it('requests JSON output with 11 target fields + accuracy_score', () => {
+  it('includes title guidelines with SEO focus', () => {
+    const product = makeProduct()
+    const prompt = buildEnrichmentPrompt(product)
+
+    expect(prompt).toContain('Title Guidelines')
+    expect(prompt).toMatch(/actual product name/i)
+    expect(prompt).toMatch(/generic|duplicates/i)
+  })
+
+  it('requests JSON output with 12 target fields + accuracy_score', () => {
     const product = makeProduct()
     const prompt = buildEnrichmentPrompt(product)
 

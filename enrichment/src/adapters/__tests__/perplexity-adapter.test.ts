@@ -69,6 +69,7 @@ const MOCK_PRODUCT: Product = {
 }
 
 const MOCK_ENRICHED_JSON = {
+  title: 'GG Marmont Small Matelasse Shoulder Bag',
   description_eng: 'A luxurious leather bag from Gucci.',
   season: 'FW23',
   year: '2023',

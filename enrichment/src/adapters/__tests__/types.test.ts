@@ -10,8 +10,9 @@ import {
 } from '../types.js'
 
 describe('EnrichedFieldsSchema', () => {
-  it('validates object with all 11 target fields', () => {
+  it('validates object with all 12 target fields', () => {
     const input = {
+      title: 'GG Marmont Shoulder Bag',
       description_eng: 'A luxury leather bag',
       season: 'FW23',
       year: '2023',
@@ -63,8 +64,9 @@ describe('EnrichedFieldsSchema', () => {
 })
 
 describe('ENRICHMENT_TARGET_FIELDS', () => {
-  it('contains exactly 11 field names', () => {
-    expect(ENRICHMENT_TARGET_FIELDS).toHaveLength(11)
+  it('contains exactly 12 field names', () => {
+    expect(ENRICHMENT_TARGET_FIELDS).toHaveLength(12)
+    expect(ENRICHMENT_TARGET_FIELDS).toContain('title')
     expect(ENRICHMENT_TARGET_FIELDS).toContain('description_eng')
     expect(ENRICHMENT_TARGET_FIELDS).toContain('season')
     expect(ENRICHMENT_TARGET_FIELDS).toContain('year')
@@ -99,7 +101,7 @@ describe('EnrichmentResult type', () => {
 })
 
 describe('computeFillRate', () => {
-  it('returns correct percentage for partial enrichment (e.g., 6/11 = 0.55)', () => {
+  it('returns correct percentage for partial enrichment (e.g., 6/12 = 0.5)', () => {
     const fields: EnrichedFields = {
       description_eng: 'A luxury bag',
       season: 'FW23',
@@ -107,9 +109,9 @@ describe('computeFillRate', () => {
       collection: 'Fall/Winter',
       gtin: '1234567890123',
       dimensions: '30x20x10cm',
-      // made_in, materials, weight, color, additional_info left undefined
+      // title, made_in, materials, weight, color, additional_info left undefined
     }
-    expect(computeFillRate(fields)).toBe(0.55)
+    expect(computeFillRate(fields)).toBe(0.5)
   })
 
   it('returns 0 for empty fields', () => {
@@ -118,6 +120,7 @@ describe('computeFillRate', () => {
 
   it('returns 1.0 for all filled', () => {
     const fields: EnrichedFields = {
+      title: 'GG Marmont Bag',
       description_eng: 'Test',
       season: 'FW23',
       year: '2023',
@@ -139,7 +142,7 @@ describe('computeFillRate', () => {
       season: '',
       year: '',
     }
-    expect(computeFillRate(fields)).toBeCloseTo(1 / 11, 2)
+    expect(computeFillRate(fields)).toBeCloseTo(1 / 12, 2)
   })
 })
 

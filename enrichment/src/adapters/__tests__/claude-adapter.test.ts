@@ -81,6 +81,7 @@ const SAMPLE_PRODUCT: Product = {
 }
 
 const FULL_ENRICHMENT_RESPONSE = {
+  title: 'GG Marmont Small Shoulder Bag',
   description_eng: 'A luxurious leather bag crafted in Italy.',
   season: 'Fall Winter 2023',
   year: '2023',
@@ -96,6 +97,7 @@ const FULL_ENRICHMENT_RESPONSE = {
 }
 
 const PARTIAL_ENRICHMENT_RESPONSE = {
+  title: 'GG Marmont Bag',
   description_eng: 'A luxurious leather bag.',
   season: 'Fall Winter 2023',
   year: '',
@@ -242,7 +244,7 @@ describe('Claude Adapter', () => {
     expect(result.enrichedFields).toContain('description_eng')
     expect(result.enrichedFields).toContain('made_in')
     expect(result.enrichedFields).toContain('materials')
-    expect(result.enrichedFields.length).toBe(11)
+    expect(result.enrichedFields.length).toBe(12)
     expect(result.fields.description_eng).toBe('A luxurious leather bag crafted in Italy.')
   })
 
