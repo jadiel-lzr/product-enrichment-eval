@@ -127,9 +127,11 @@ FIELD_DESCRIPTIONS = {
         "Check: product details/specs table, JSON-LD. Return null if not found."
     ),
     "made_in": (
-        "Country of manufacture. "
+        "Country of manufacture in English. "
         "Check: 'Made in', 'Country of origin', 'Fabricated in' labels; "
         "JSON-LD 'countryOfOrigin'; product details/specs table. "
+        "If the country name is in a non-English language, translate it to English "
+        "(e.g., 'ИНДОНЕЗИЯ' → 'Indonesia', '이탈리아' → 'Italy'). "
         "Return just the country name (e.g., Italy). Return null if not found."
     ),
     "materials": (
@@ -150,10 +152,11 @@ FIELD_DESCRIPTIONS = {
         "Any supplementary product details not covered by other fields "
         "(e.g., care instructions, special features, fit notes, design details). "
         "Check: product details section, care labels, feature lists. "
-        "EXCLUDE all retailer/logistics info: available sizes, shipping costs, "
-        "delivery estimates, return/exchange policies, stock availability, "
+        "EXCLUDE all retailer/logistics info: available sizes (e.g., 'Available Sizes: XS'), "
+        "available colors (e.g., 'Available Colors: khaki'), "
+        "shipping costs, delivery estimates, return/exchange policies, stock availability, "
         "pricing, promotional eligibility (e.g., 'excluded from promotional offers'), "
-        "and any promotional or marketplace-specific text. "
+        "designer model numbers, and any promotional or marketplace-specific text. "
         "Only include information intrinsic to the product itself. "
         "If the text is in a non-English language, translate it to English. "
         "Return null if only retailer info is found with no actual product details."
