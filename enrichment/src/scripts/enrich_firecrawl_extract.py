@@ -83,6 +83,8 @@ FIELD_DESCRIPTIONS = {
         "Product name or title in English. Check: visible heading/title, <title> tag, "
         "og:title meta tag, JSON-LD 'name' field. "
         "If the title is in a non-English language, translate it to English. "
+        "The title MUST include the brand name as a prefix if not already present "
+        "(e.g., 'Gucci GG Marmont Bag' not just 'GG Marmont Bag'). "
         "Return null if not found."
     ),
     "description_eng": (
@@ -112,9 +114,12 @@ FIELD_DESCRIPTIONS = {
         "Check: product details, breadcrumbs, tags. Return null if not found."
     ),
     "gtin": (
-        "GTIN, EAN, or UPC barcode (typically 13 digits). "
+        "GTIN, EAN, or UPC barcode(s) (typically 13 digits each). "
         "Check: JSON-LD 'gtin', 'gtin13', 'gtin8', 'ean' fields; "
-        "product:ean or product:isbn meta tags; visible barcode label. "
+        "product:ean or product:isbn meta tags; visible barcode label; "
+        "also check size variant data for per-size barcodes. "
+        "If multiple GTINs are found, return them as a comma-separated string "
+        "(e.g., '2003421341071, 2003421341072'). "
         "Return null if not found — do NOT generate or guess a barcode."
     ),
     "dimensions": (
@@ -147,8 +152,10 @@ FIELD_DESCRIPTIONS = {
         "Check: product details section, care labels, feature lists. "
         "EXCLUDE all retailer/logistics info: available sizes, shipping costs, "
         "delivery estimates, return/exchange policies, stock availability, "
-        "pricing, and any promotional or marketplace-specific text. "
+        "pricing, promotional eligibility (e.g., 'excluded from promotional offers'), "
+        "and any promotional or marketplace-specific text. "
         "Only include information intrinsic to the product itself. "
+        "If the text is in a non-English language, translate it to English. "
         "Return null if only retailer info is found with no actual product details."
     ),
 }
@@ -313,6 +320,32 @@ def load_completed_skus() -> set[str]:
     except Exception as e:
         print(f"Warning: could not read output file ({e}). Starting fresh.")
     return completed
+
+
+# ── Field normalization ───────────────────────────────────────────────────────
+
+def normalize_gtin(value: str) -> str:
+    """Convert JSON array gtin to comma-separated string to match TS adapter format."""
+    stripped = value.strip()
+    if not stripped:
+        return ""
+    if stripped.startswith("["):
+        try:
+            items = json.loads(stripped)
+            if isinstance(items, list):
+                return ", ".join(str(item).strip() for item in items if str(item).strip())
+        except (json.JSONDecodeError, TypeError):
+            pass
+    return stripped
+
+
+def normalize_row(row: dict) -> dict:
+    """Normalize field formats before writing to CSV."""
+    result = dict(row)
+    gtin_val = result.get("gtin", "")
+    if gtin_val:
+        result["gtin"] = normalize_gtin(gtin_val)
+    return result
 
 
 # ── Per-row processing (runs in thread) ──────────────────────────────────────
@@ -550,7 +583,7 @@ def main() -> None:
             nonlocal total_credits, total_tokens
 
             with write_lock:
-                writer.writerow(result.out_row)
+                writer.writerow(normalize_row(result.out_row))
                 out_f.flush()
 
                 total_credits += result.credits
