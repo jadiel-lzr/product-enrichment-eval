@@ -207,7 +207,7 @@ function createDataset() {
           scoreTrack: 'confidence',
           fieldsEnriched: 0,
         }),
-        createEnrichment('sku-3', 'perplexity', {
+        createEnrichment('sku-3', 'gpt', {
           status: 'partial',
           error: 'missing-confidence',
           accuracyScore: undefined,
@@ -276,7 +276,7 @@ describe('analysis scoring', () => {
       weights: buildWeightConfig(),
     })
 
-    expect(summary.noConfidenceRows.map((row) => row.tool)).toEqual(['firecrawl', 'perplexity'])
+    expect(summary.noConfidenceRows.map((row) => row.tool)).toEqual(['firecrawl', 'gpt'])
     expect(summary.noConfidenceRows.every((row) => row.scoreTrack === 'no-confidence')).toBe(true)
   })
 
@@ -337,11 +337,11 @@ describe('analysis scoring', () => {
     })
 
     const gemini = summary.confidenceRows.find((row) => row.tool === 'gemini')
-    const perplexity = summary.noConfidenceRows.find((row) => row.tool === 'perplexity')
+    const gpt = summary.noConfidenceRows.find((row) => row.tool === 'gpt')
 
     expect(gemini?.failedCount).toBe(1)
-    expect(perplexity?.partialCount).toBe(1)
-    expect(perplexity?.errorCount).toBe(1)
+    expect(gpt?.partialCount).toBe(1)
+    expect(gpt?.errorCount).toBe(1)
   })
 
   it('builds export rows for the current analysis view', () => {

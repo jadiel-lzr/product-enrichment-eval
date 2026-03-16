@@ -44,7 +44,7 @@ export const DEFAULT_CONCURRENCY: Record<string, number> = {
   claude: 3,
   gemini: 5,
   firecrawl: 2,
-  perplexity: 3,
+  gpt: 3,
 }
 
 export async function runBatch(

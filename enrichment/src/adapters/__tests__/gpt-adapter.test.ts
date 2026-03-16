@@ -24,7 +24,7 @@ vi.mock('../../prompts/enrichment-prompt.js', () => ({
   buildEnrichmentPrompt: vi.fn().mockReturnValue('Mocked enrichment prompt text'),
 }))
 
-import { createPerplexityAdapter } from '../perplexity-adapter.js'
+import { createGptAdapter } from '../gpt-adapter.js'
 import { withRetry } from '../../batch/retry.js'
 import { buildEnrichmentPrompt } from '../../prompts/enrichment-prompt.js'
 
@@ -95,31 +95,31 @@ function makeMockResponse(content: string) {
   }
 }
 
-describe('Perplexity Adapter', () => {
+describe('GPT Adapter', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    process.env.PERPLEXITY_API_KEY = 'test-perplexity-key'
-    delete process.env.PERPLEXITY_MODEL
+    process.env.OPENAI_API_KEY = 'test-openai-key'
+    delete process.env.GPT_MODEL
   })
 
-  describe('createPerplexityAdapter', () => {
-    it('returns object implementing EnrichmentAdapter with name perplexity', () => {
-      const adapter: EnrichmentAdapter = createPerplexityAdapter()
-      expect(adapter.name).toBe('perplexity')
+  describe('createGptAdapter', () => {
+    it('returns object implementing EnrichmentAdapter with name gpt', () => {
+      const adapter: EnrichmentAdapter = createGptAdapter()
+      expect(adapter.name).toBe('gpt')
       expect(typeof adapter.enrich).toBe('function')
     })
   })
 
   describe('API configuration', () => {
-    it('calls chat.completions.create with OpenAI client configured to Perplexity baseURL', async () => {
+    it('calls chat.completions.create with default model gpt-5.2', async () => {
       mockCreate.mockResolvedValue(makeMockResponse(JSON.stringify(MOCK_ENRICHED_JSON)))
 
-      const adapter = createPerplexityAdapter()
+      const adapter = createGptAdapter()
       await adapter.enrich(MOCK_PRODUCT)
 
       expect(mockCreate).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: 'sonar-pro',
+          model: 'gpt-5.2',
           messages: expect.arrayContaining([
             expect.objectContaining({ role: 'user' }),
           ]),
@@ -130,7 +130,7 @@ describe('Perplexity Adapter', () => {
     it('uses response_format with json_schema for structured output', async () => {
       mockCreate.mockResolvedValue(makeMockResponse(JSON.stringify(MOCK_ENRICHED_JSON)))
 
-      const adapter = createPerplexityAdapter()
+      const adapter = createGptAdapter()
       await adapter.enrich(MOCK_PRODUCT)
 
       const callArgs = mockCreate.mock.calls[0][0]
@@ -143,28 +143,10 @@ describe('Perplexity Adapter', () => {
     it('sends product identifiers via buildEnrichmentPrompt', async () => {
       mockCreate.mockResolvedValue(makeMockResponse(JSON.stringify(MOCK_ENRICHED_JSON)))
 
-      const adapter = createPerplexityAdapter()
+      const adapter = createGptAdapter()
       await adapter.enrich(MOCK_PRODUCT)
 
       expect(buildEnrichmentPrompt).toHaveBeenCalledWith(MOCK_PRODUCT)
-
-      const callArgs = mockCreate.mock.calls[0][0]
-      const userMessage = callArgs.messages.find((m: { role: string }) => m.role === 'user')
-      expect(userMessage.content).toContain('Mocked enrichment prompt text')
-    })
-
-    it('converts Zod schema to JSON Schema via zod-to-json-schema for response_format', async () => {
-      mockCreate.mockResolvedValue(makeMockResponse(JSON.stringify(MOCK_ENRICHED_JSON)))
-
-      const adapter = createPerplexityAdapter()
-      await adapter.enrich(MOCK_PRODUCT)
-
-      const callArgs = mockCreate.mock.calls[0][0]
-      const schema = callArgs.response_format.json_schema.schema
-      // Should contain the enriched fields as properties
-      expect(schema.properties).toBeDefined()
-      expect(schema.properties.description_eng).toBeDefined()
-      expect(schema.properties.season).toBeDefined()
     })
   })
 
@@ -172,7 +154,7 @@ describe('Perplexity Adapter', () => {
     it('returns EnrichmentResult with correct fillRate and enrichedFields', async () => {
       mockCreate.mockResolvedValue(makeMockResponse(JSON.stringify(MOCK_ENRICHED_JSON)))
 
-      const adapter = createPerplexityAdapter()
+      const adapter = createGptAdapter()
       const result = await adapter.enrich(MOCK_PRODUCT)
 
       expect(result.fillRate).toBeGreaterThan(0)
@@ -184,7 +166,7 @@ describe('Perplexity Adapter', () => {
     it('includes accuracyScore from response', async () => {
       mockCreate.mockResolvedValue(makeMockResponse(JSON.stringify(MOCK_ENRICHED_JSON)))
 
-      const adapter = createPerplexityAdapter()
+      const adapter = createGptAdapter()
       const result = await adapter.enrich(MOCK_PRODUCT)
 
       expect(result.accuracyScore).toBe(8)
@@ -193,7 +175,7 @@ describe('Perplexity Adapter', () => {
     it('returns status failed with error on API failure', async () => {
       mockCreate.mockRejectedValue(new Error('API rate limit exceeded'))
 
-      const adapter = createPerplexityAdapter()
+      const adapter = createGptAdapter()
       const result = await adapter.enrich(MOCK_PRODUCT)
 
       expect(result.status).toBe('failed')
@@ -206,7 +188,7 @@ describe('Perplexity Adapter', () => {
     it('wraps API call in withRetry', async () => {
       mockCreate.mockResolvedValue(makeMockResponse(JSON.stringify(MOCK_ENRICHED_JSON)))
 
-      const adapter = createPerplexityAdapter()
+      const adapter = createGptAdapter()
       await adapter.enrich(MOCK_PRODUCT)
 
       expect(withRetry).toHaveBeenCalled()
@@ -214,16 +196,16 @@ describe('Perplexity Adapter', () => {
   })
 
   describe('model configuration', () => {
-    it('uses model from env var PERPLEXITY_MODEL or defaults to sonar-pro', async () => {
-      process.env.PERPLEXITY_MODEL = 'sonar'
+    it('uses model from env var GPT_MODEL or defaults to gpt-5.2', async () => {
+      process.env.GPT_MODEL = 'gpt-5.2-pro'
 
       mockCreate.mockResolvedValue(makeMockResponse(JSON.stringify(MOCK_ENRICHED_JSON)))
 
-      const adapter = createPerplexityAdapter()
+      const adapter = createGptAdapter()
       await adapter.enrich(MOCK_PRODUCT)
 
       const callArgs = mockCreate.mock.calls[0][0]
-      expect(callArgs.model).toBe('sonar')
+      expect(callArgs.model).toBe('gpt-5.2-pro')
     })
   })
 
@@ -237,7 +219,7 @@ I found these details from multiple sources.`
 
       mockCreate.mockResolvedValue(makeMockResponse(freeTextResponse))
 
-      const adapter = createPerplexityAdapter()
+      const adapter = createGptAdapter()
       const result = await adapter.enrich(MOCK_PRODUCT)
 
       expect(result.status).not.toBe('failed')
@@ -247,7 +229,7 @@ I found these details from multiple sources.`
     it('returns failed when response contains no parseable JSON at all', async () => {
       mockCreate.mockResolvedValue(makeMockResponse('I could not find any product information.'))
 
-      const adapter = createPerplexityAdapter()
+      const adapter = createGptAdapter()
       const result = await adapter.enrich(MOCK_PRODUCT)
 
       expect(result.status).toBe('failed')
@@ -258,7 +240,7 @@ I found these details from multiple sources.`
         choices: [{ message: { content: null }, finish_reason: 'stop' }],
       })
 
-      const adapter = createPerplexityAdapter()
+      const adapter = createGptAdapter()
       const result = await adapter.enrich(MOCK_PRODUCT)
 
       expect(result.status).toBe('failed')

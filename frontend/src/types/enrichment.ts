@@ -3,20 +3,20 @@ export type { Product, EnrichedFields } from '@shared/index'
 export { ENRICHMENT_TARGET_FIELDS } from '@shared/index'
 
 // Tool identifiers
-export type ToolName = 'claude' | 'gemini' | 'firecrawl' | 'perplexity'
+export type ToolName = 'claude' | 'gemini' | 'firecrawl' | 'gpt'
 
 export const TOOL_NAMES: readonly ToolName[] = [
   'claude',
   'gemini',
   'firecrawl',
-  'perplexity',
+  'gpt',
 ] as const
 
 export const TOOL_DISPLAY_NAMES: Record<ToolName, string> = {
   claude: 'Claude',
   gemini: 'Gemini',
   firecrawl: 'FireCrawl',
-  perplexity: 'Perplexity',
+  gpt: 'GPT',
 }
 
 // Core enrichment target fields (matches ENRICHMENT_TARGET_FIELDS from shared schema)

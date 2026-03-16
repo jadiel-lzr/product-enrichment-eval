@@ -4,7 +4,7 @@ import type { ImageInput } from './types.js'
 
 const JSON_EXTRACT_PATTERN = /\{[\s\S]*\}/
 
-type LiteLLMTool = 'claude' | 'gemini' | 'perplexity'
+type LiteLLMTool = 'claude' | 'gemini' | 'gpt'
 
 function getFirstNonEmptyEnv(keys: readonly string[]): string {
   for (const key of keys) {
@@ -35,7 +35,7 @@ export function createLiteLLMClient(tool: LiteLLMTool): OpenAI {
   const apiKeyEnvKeysByTool: Record<LiteLLMTool, readonly string[]> = {
     claude: ['CLAUDE_API_KEY', 'LITELLM_API_KEY', 'ANTHROPIC_API_KEY'],
     gemini: ['GEMINI_API_KEY', 'LITELLM_API_KEY', 'GOOGLE_GENAI_API_KEY'],
-    perplexity: ['PERPLEXITY_API_KEY', 'LITELLM_API_KEY'],
+    gpt: ['OPENAI_API_KEY', 'GPT_API_KEY', 'LITELLM_API_KEY'],
   }
   const apiKeyEnvKeys = apiKeyEnvKeysByTool[tool]
 

@@ -117,7 +117,7 @@ describe('runBatch', () => {
       claude: 3,
       gemini: 5,
       firecrawl: 2,
-      perplexity: 3,
+      gpt: 3,
     })
     expect(result.results).toHaveLength(2)
     expect(result.results.map((entry) => entry.sku)).toEqual(['SKU-1', 'SKU-2'])

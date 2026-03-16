@@ -2,25 +2,25 @@ import OpenAI from 'openai'
 import { zodToJsonSchema } from 'zod-to-json-schema'
 import type { Product } from '../types/product.js'
 import { EnrichedFieldsSchema } from '../types/enriched.js'
-import type { EnrichmentAdapter, EnrichmentResult } from './types.js'
+import type { EnrichmentAdapter, EnrichmentResult, ImageInput } from './types.js'
 import { computeFillRate } from './types.js'
 import { buildEnrichmentPrompt } from '../prompts/enrichment-prompt.js'
 import { withRetry } from '../batch/retry.js'
 import {
+  buildOpenAIContentParts,
   buildOpenAIJsonSchemaResponseFormat,
   createLiteLLMClient,
   shouldUseLiteLLM,
   tryParseJsonContent,
 } from './litellm.js'
 
-const ADAPTER_NAME = 'perplexity'
-const DEFAULT_MODEL = 'sonar-pro'
-const DEFAULT_PERPLEXITY_BASE_URL = 'https://api.perplexity.ai'
+const ADAPTER_NAME = 'gpt'
+const DEFAULT_MODEL = 'gpt-5.2'
+const DEFAULT_GPT_BASE_URL = 'https://api.openai.com/v1'
 
-// Pre-compute JSON schema from Zod schema once
 const enrichedJsonSchema = zodToJsonSchema(EnrichedFieldsSchema) as Record<string, unknown>
 
-function buildPerplexityResult(parsed: Record<string, unknown>): EnrichmentResult {
+function buildGptResult(parsed: Record<string, unknown>): EnrichmentResult {
   const validated = EnrichedFieldsSchema.parse(parsed)
 
   const fillRate = computeFillRate(validated)
@@ -49,16 +49,19 @@ function buildFailedResult(error: string): EnrichmentResult {
   }
 }
 
-function createNativePerplexityAdapter(): EnrichmentAdapter {
-  const apiKey = process.env.PERPLEXITY_API_KEY ?? ''
-  const baseURL = process.env.PERPLEXITY_BASE_URL ?? DEFAULT_PERPLEXITY_BASE_URL
+function createNativeGptAdapter(): EnrichmentAdapter {
+  const apiKey = process.env.OPENAI_API_KEY ?? ''
+  const baseURL = process.env.GPT_BASE_URL ?? DEFAULT_GPT_BASE_URL
   const client = new OpenAI({ apiKey, baseURL })
-  const model = process.env.PERPLEXITY_MODEL ?? DEFAULT_MODEL
+  const model = process.env.GPT_MODEL ?? DEFAULT_MODEL
 
   return {
     name: ADAPTER_NAME,
 
-    async enrich(product: Product): Promise<EnrichmentResult> {
+    async enrich(
+      product: Product,
+      images?: readonly ImageInput[],
+    ): Promise<EnrichmentResult> {
       try {
         const promptText = buildEnrichmentPrompt(product)
 
@@ -66,23 +69,28 @@ function createNativePerplexityAdapter(): EnrichmentAdapter {
           () =>
             client.chat.completions.create({
               model,
-              messages: [{ role: 'user', content: promptText }],
+              messages: [
+                {
+                  role: 'user',
+                  content: buildOpenAIContentParts(promptText, images),
+                },
+              ],
               response_format: buildOpenAIJsonSchemaResponseFormat(enrichedJsonSchema),
             }),
-          `perplexity-enrich:${product.sku}`,
+          `gpt-enrich:${product.sku}`,
         )
 
         const content = response.choices[0]?.message?.content
         if (!content) {
-          return buildFailedResult('Empty response from Perplexity API')
+          return buildFailedResult('Empty response from GPT API')
         }
 
         const parsed = tryParseJsonContent(content)
         if (!parsed) {
-          return buildFailedResult('Failed to parse JSON from Perplexity response')
+          return buildFailedResult('Failed to parse JSON from GPT response')
         }
 
-        return buildPerplexityResult(parsed)
+        return buildGptResult(parsed)
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
         return buildFailedResult(message)
@@ -91,15 +99,18 @@ function createNativePerplexityAdapter(): EnrichmentAdapter {
   }
 }
 
-function createLiteLLMPerplexityAdapter(): EnrichmentAdapter {
-  const client = createLiteLLMClient('perplexity')
-  const model = process.env.PERPLEXITY_MODEL ?? DEFAULT_MODEL
+function createLiteLLMGptAdapter(): EnrichmentAdapter {
+  const client = createLiteLLMClient('gpt')
+  const model = process.env.GPT_MODEL ?? DEFAULT_MODEL
   const responseFormat = buildOpenAIJsonSchemaResponseFormat(enrichedJsonSchema)
 
   return {
     name: ADAPTER_NAME,
 
-    async enrich(product: Product): Promise<EnrichmentResult> {
+    async enrich(
+      product: Product,
+      images?: readonly ImageInput[],
+    ): Promise<EnrichmentResult> {
       try {
         const promptText = buildEnrichmentPrompt(product)
 
@@ -107,23 +118,28 @@ function createLiteLLMPerplexityAdapter(): EnrichmentAdapter {
           () =>
             client.chat.completions.create({
               model,
-              messages: [{ role: 'user', content: promptText }],
+              messages: [
+                {
+                  role: 'user',
+                  content: buildOpenAIContentParts(promptText, images),
+                },
+              ],
               response_format: responseFormat,
             }),
-          `perplexity-enrich:${product.sku}`,
+          `gpt-enrich:${product.sku}`,
         )
 
         const content = response.choices[0]?.message?.content
         if (!content) {
-          return buildFailedResult('Empty response from Perplexity LiteLLM route')
+          return buildFailedResult('Empty response from GPT LiteLLM route')
         }
 
         const parsed = tryParseJsonContent(content)
         if (!parsed) {
-          return buildFailedResult('Failed to parse JSON from Perplexity LiteLLM response')
+          return buildFailedResult('Failed to parse JSON from GPT LiteLLM response')
         }
 
-        return buildPerplexityResult(parsed)
+        return buildGptResult(parsed)
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
         return buildFailedResult(message)
@@ -132,8 +148,8 @@ function createLiteLLMPerplexityAdapter(): EnrichmentAdapter {
   }
 }
 
-export function createPerplexityAdapter(): EnrichmentAdapter {
-  return shouldUseLiteLLM('perplexity')
-    ? createLiteLLMPerplexityAdapter()
-    : createNativePerplexityAdapter()
+export function createGptAdapter(): EnrichmentAdapter {
+  return shouldUseLiteLLM('gpt')
+    ? createLiteLLMGptAdapter()
+    : createNativeGptAdapter()
 }

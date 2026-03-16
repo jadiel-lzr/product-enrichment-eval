@@ -5,16 +5,16 @@ import { fileURLToPath } from 'node:url'
 import { createClaudeAdapter } from '../adapters/claude-adapter.js'
 import { createFirecrawlAdapter } from '../adapters/firecrawl-adapter.js'
 import { createGeminiAdapter } from '../adapters/gemini-adapter.js'
-import { createPerplexityAdapter } from '../adapters/perplexity-adapter.js'
+import { createGptAdapter } from '../adapters/gpt-adapter.js'
 import type { EnrichmentAdapter } from '../adapters/types.js'
 import { generateRunReport, writeRunReport } from '../batch/report.js'
 import { DEFAULT_CONCURRENCY, runBatch } from '../batch/runner.js'
 import { parseProductCSV } from '../parsers/csv-reader.js'
 
-type ToolName = 'claude' | 'gemini' | 'firecrawl' | 'perplexity'
+type ToolName = 'claude' | 'gemini' | 'firecrawl' | 'gpt'
 type ToolOption = ToolName | 'all' | 'all-llm'
 
-const LLM_TOOLS: readonly ToolName[] = ['claude', 'gemini', 'perplexity']
+const LLM_TOOLS: readonly ToolName[] = ['claude', 'gemini', 'gpt']
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(scriptDir, '../../../')
@@ -34,7 +34,7 @@ const TOOL_FACTORIES: Record<ToolName, () => EnrichmentAdapter> = {
   claude: createClaudeAdapter,
   gemini: createGeminiAdapter,
   firecrawl: () => createFirecrawlAdapter(),
-  perplexity: createPerplexityAdapter,
+  gpt: createGptAdapter,
 }
 
 async function main(): Promise<void> {
@@ -120,7 +120,7 @@ function parseLimitArg(args: readonly string[]): number | undefined {
 
 function printUsage(): void {
   const scriptName = 'npx tsx src/scripts/enrich.ts'
-  console.error(`Usage: ${scriptName} --tool claude|gemini|firecrawl|perplexity|all|all-llm [--limit N]`)
+  console.error(`Usage: ${scriptName} --tool claude|gemini|firecrawl|gpt|all|all-llm [--limit N]`)
 }
 
 main().catch((error) => {

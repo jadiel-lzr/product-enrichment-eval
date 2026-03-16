@@ -6,7 +6,7 @@ import Papa from 'papaparse'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
-const TOOL_NAMES = ['claude', 'gemini', 'firecrawl', 'perplexity'] as const
+const TOOL_NAMES = ['claude', 'gemini', 'firecrawl', 'gpt'] as const
 
 const DATA_DIR = resolve(__dirname, '../../data')
 const BASE_CSV_PATH = resolve(DATA_DIR, 'base.csv')
