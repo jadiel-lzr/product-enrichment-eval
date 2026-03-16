@@ -76,10 +76,15 @@ FIELD_DESCRIPTIONS = {
         "og:title meta tag, JSON-LD 'name' field. Return null if not found."
     ),
     "description_eng": (
-        "Full product description in English. Check: visible description text, "
-        "<meta name='description'>, og:description meta tag, JSON-LD 'description' field, "
-        "any product details or 'About this item' section. "
-        "Return the most complete version found. Return null if not found."
+        "Full product description in English focusing ONLY on the product itself. "
+        "Check: visible description text, <meta name='description'>, og:description meta tag, "
+        "JSON-LD 'description' field, any product details or 'About this item' section. "
+        "Return the most complete version found. "
+        "EXCLUDE all retailer/marketplace marketing: store names, discount percentages, "
+        "sale events, pricing, shipping info, promotional language (e.g., 'up to X% off', "
+        "'exclusive sale', 'unbeatable prices', 'free shipping'). "
+        "Only include text that describes the product's features, design, fit, or craftsmanship. "
+        "Return null if only marketing text is found with no actual product description."
     ),
     "season": (
         "Fashion season (e.g., SS25, FW25, AW24, Spring/Summer 2025). "
@@ -197,7 +202,11 @@ def create_extract_job(
             "Schema.org markup, and product details/specs tables. "
             "ONLY return values that are explicitly present in the page content or its metadata — "
             "do NOT infer, guess, or fabricate any values. "
-            "If a field is not clearly present anywhere on the page, return null for that field."
+            "If a field is not clearly present anywhere on the page, return null for that field. "
+            "IMPORTANT: Strip out ALL retailer/marketplace noise from extracted text — "
+            "do NOT include store names, competitor brand names, discount percentages, "
+            "sale/promotion language, pricing, shipping details, or any marketing copy. "
+            "Return only factual product information (features, materials, design, fit, craftsmanship)."
         ),
         "schema": {
             "type": "object",
