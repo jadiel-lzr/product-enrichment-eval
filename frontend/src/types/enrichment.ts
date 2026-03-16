@@ -78,6 +78,7 @@ export interface FilterState {
   readonly brand: string
   readonly category: string
   readonly department: string
+  readonly enrichedBy: string
 }
 
 export const EMPTY_FILTERS: FilterState = {
@@ -85,4 +86,5 @@ export const EMPTY_FILTERS: FilterState = {
   brand: '',
   category: '',
   department: '',
+  enrichedBy: '',
 }

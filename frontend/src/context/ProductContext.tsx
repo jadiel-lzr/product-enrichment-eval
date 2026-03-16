@@ -99,14 +99,25 @@ export function ProductProvider({ children }: ProductProviderProps) {
   const sortedProducts = useMemo(() => sortProducts(products), [products])
 
   const filteredProducts = useMemo(() => {
-    return sortedProducts.filter(
-      (product) =>
-        matchesSearch(product, filters.search) &&
-        matchesFilter(product.brand, filters.brand) &&
-        matchesFilter(product.category, filters.category) &&
-        matchesFilter(product.department, filters.department),
-    )
-  }, [sortedProducts, filters])
+    return sortedProducts.filter((product) => {
+      if (!matchesSearch(product, filters.search)) return false
+      if (!matchesFilter(product.brand, filters.brand)) return false
+      if (!matchesFilter(product.category, filters.category)) return false
+      if (!matchesFilter(product.department, filters.department)) return false
+
+      if (filters.enrichedBy) {
+        const enrichments = enrichmentsByProduct.get(product.sku)
+        if (!enrichments) return false
+        if (filters.enrichedBy === 'all') {
+          const toolsForProduct = new Set(enrichments.map((e) => e.tool))
+          return TOOL_NAMES.every((t) => toolsForProduct.has(t))
+        }
+        return enrichments.some((e) => e.tool === filters.enrichedBy)
+      }
+
+      return true
+    })
+  }, [sortedProducts, filters, enrichmentsByProduct])
 
   const availableTools = useMemo<ToolName[]>(() => {
     const toolsWithData = new Set<ToolName>()
