@@ -15,8 +15,9 @@ It supports:
 - `claude`
 - `gemini`
 - `firecrawl`
-- `perplexity`
+- `gpt`
 - `all`
+- `all-llm` (claude + gemini + gpt, skips firecrawl)
 
 Outputs are written to:
 
@@ -31,29 +32,7 @@ cd enrichment
 npm install
 ```
 
-### 2. Confirm the Input Data Exists
-
-These files should already exist before you run live enrichment:
-
-- `data/base.csv`
-- `data/image-manifest.json`
-- `data/images/`
-
-Quick check:
-
-```bash
-ls data
-```
-
-If any of those are missing, build them first:
-
-```bash
-cd enrichment
-npm run parse-and-clean
-npm run cache-images
-```
-
-### 3. Set the Required API Keys
+### 2. Set the Required API Keys
 
 The script auto-loads `enrichment/.env` if it exists. Copy the example and fill in your keys:
 
@@ -67,19 +46,41 @@ Then edit `enrichment/.env` with the keys for the tools you want to test:
 ANTHROPIC_API_KEY=your-key-here
 GOOGLE_GENAI_API_KEY=your-key-here
 FIRECRAWL_API_KEY=your-key-here
-PERPLEXITY_API_KEY=your-key-here
+OPENAI_API_KEY=your-key-here
 
 # Optional model overrides
 CLAUDE_MODEL=claude-haiku-4-5-20250415
 GEMINI_MODEL=gemini-2.5-flash
-PERPLEXITY_MODEL=sonar-pro
+GPT_MODEL=gpt-5.2
 
 # LiteLLM proxy (alternative to direct API keys)
 LITELLM_BASE_URL=http://localhost:4000
 LITELLM_API_KEY=your-litellm-key
 ```
 
-You only need the key for the tool you plan to test. When using LiteLLM, prefix the model name with the provider (e.g. `PERPLEXITY_MODEL=perplexity/sonar-pro`).
+You only need the key for the tool you plan to test. When using LiteLLM, prefix the model name with the provider (e.g. `GPT_MODEL=openai/gpt-5.2`).
+
+### 3. Prepare Input Data
+
+Before running enrichment, you need the cleaned product feed and cached images:
+
+```bash
+cd enrichment
+
+# Parse and clean the raw product feed into data/base.csv
+npm run parse-and-clean
+
+# Check image URLs and download locally into data/images/
+npm run cache-images
+```
+
+Verify the data exists:
+
+```bash
+ls data/base.csv data/image-manifest.json data/images/
+```
+
+These only need to run once. Re-run `cache-images` if you add new products or if image URLs change.
 
 ### 4. Run the Safe Local Checks First
 
@@ -141,16 +142,16 @@ npx tsx src/scripts/enrich.ts --tool claude
 npx tsx src/scripts/enrich.ts --tool gemini
 ```
 
+#### GPT
+
+```bash
+npx tsx src/scripts/enrich.ts --tool gpt
+```
+
 #### FireCrawl
 
 ```bash
 npx tsx src/scripts/enrich.ts --tool firecrawl
-```
-
-#### Perplexity
-
-```bash
-npx tsx src/scripts/enrich.ts --tool perplexity
 ```
 
 Expected console behavior:
@@ -224,10 +225,10 @@ Only do this after single-tool runs look healthy.
 
 ```bash
 cd enrichment
-# All tools (claude, gemini, firecrawl, perplexity)
+# All tools (claude, gemini, firecrawl, gpt)
 npx tsx src/scripts/enrich.ts --tool all
 
-# LLM tools only (claude, gemini, perplexity — skips firecrawl)
+# LLM tools only (claude, gemini, gpt — skips firecrawl)
 npm run enrich:llm
 ```
 
@@ -247,9 +248,15 @@ Fix: delete that tool's checkpoint file before rerunning.
 
 #### Missing cached images
 
-Symptom: LLM tools still run, but image-backed testing is incomplete.
+Symptom: LLM tools still run, but image-backed enrichment is incomplete.
 
 Fix: rerun `npm run cache-images`.
+
+#### Missing base.csv or image-manifest.json
+
+Symptom: script fails at startup with file not found.
+
+Fix: run `npm run parse-and-clean` then `npm run cache-images`.
 
 #### Provider returns partial or failed rows
 
@@ -351,8 +358,12 @@ npm run generate-mocks
 ## Quick Reference
 
 ```bash
-# Enrichment: local checks (free)
+# Enrichment: prepare data (one-time)
 cd enrichment
+npm run parse-and-clean
+npm run cache-images
+
+# Enrichment: local checks (free)
 npx vitest run --reporter=verbose
 npx tsc --noEmit
 
@@ -362,10 +373,10 @@ npx tsx src/scripts/enrich.ts --tool claude --limit 5
 # Enrichment: full runs
 npx tsx src/scripts/enrich.ts --tool claude
 npx tsx src/scripts/enrich.ts --tool gemini
+npx tsx src/scripts/enrich.ts --tool gpt
 npx tsx src/scripts/enrich.ts --tool firecrawl
-npx tsx src/scripts/enrich.ts --tool perplexity
 npx tsx src/scripts/enrich.ts --tool all
-npm run enrich:llm  # claude + gemini + perplexity (no firecrawl)
+npm run enrich:llm  # claude + gemini + gpt (no firecrawl)
 
 # Frontend: local checks
 cd frontend
