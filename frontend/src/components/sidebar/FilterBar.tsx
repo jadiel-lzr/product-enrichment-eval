@@ -1,7 +1,13 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { useProducts } from '@/context/ProductContext'
-import { EMPTY_FILTERS } from '@/types/enrichment'
+import { EMPTY_FILTERS, TOOL_DISPLAY_NAMES, type ToolName } from '@/types/enrichment'
 import { FilterDropdown } from './FilterDropdown'
+
+const ENRICHED_BY_OPTIONS = ['all', 'claude', 'firecrawl', 'gemini', 'gpt'] as const
+const ENRICHED_BY_LABELS: Record<string, string> = {
+  all: 'All Tools',
+  ...TOOL_DISPLAY_NAMES,
+}
 
 const DEBOUNCE_MS = 200
 
@@ -28,9 +34,10 @@ function hasActiveFilters(filters: {
   brand: string
   category: string
   department: string
+  enrichedBy: string
 }): boolean {
   return Boolean(
-    filters.search || filters.brand || filters.category || filters.department,
+    filters.search || filters.brand || filters.category || filters.department || filters.enrichedBy,
   )
 }
 
@@ -89,6 +96,11 @@ export function FilterBar() {
     [filters, setFilters],
   )
 
+  const handleEnrichedByChange = useCallback(
+    (enrichedBy: string) => setFilters({ ...filters, enrichedBy }),
+    [filters, setFilters],
+  )
+
   const handleClearFilters = useCallback(() => {
     setFilters(EMPTY_FILTERS)
   }, [setFilters])
@@ -130,6 +142,13 @@ export function FilterBar() {
           value={filters.department}
           options={departments}
           onChange={handleDepartmentChange}
+        />
+        <FilterDropdown
+          label="Enriched By"
+          value={filters.enrichedBy}
+          options={[...ENRICHED_BY_OPTIONS]}
+          displayLabels={ENRICHED_BY_LABELS}
+          onChange={handleEnrichedByChange}
         />
       </div>
 

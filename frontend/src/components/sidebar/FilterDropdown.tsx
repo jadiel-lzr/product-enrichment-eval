@@ -2,6 +2,7 @@ interface FilterDropdownProps {
   readonly label: string
   readonly value: string
   readonly options: readonly string[]
+  readonly displayLabels?: Readonly<Record<string, string>>
   readonly onChange: (value: string) => void
 }
 
@@ -9,9 +10,12 @@ export function FilterDropdown({
   label,
   value,
   options,
+  displayLabels,
   onChange,
 }: FilterDropdownProps) {
-  const sorted = [...options].sort((a, b) => a.localeCompare(b))
+  const sorted = displayLabels
+    ? [...options]
+    : [...options].sort((a, b) => a.localeCompare(b))
 
   return (
     <select
@@ -22,7 +26,7 @@ export function FilterDropdown({
       <option value="">{label}</option>
       {sorted.map((option) => (
         <option key={option} value={option}>
-          {option}
+          {displayLabels?.[option] ?? option}
         </option>
       ))}
     </select>

@@ -1,0 +1,5 @@
+aiohttp
+playwright
+python-dotenv
+requests
+tqdm

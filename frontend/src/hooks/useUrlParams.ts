@@ -28,6 +28,7 @@ export function useUrlParams(): UrlParamState {
       brand: getFilterValue(searchParams, 'brand'),
       category: getFilterValue(searchParams, 'category'),
       department: getFilterValue(searchParams, 'department'),
+      enrichedBy: getFilterValue(searchParams, 'enrichedBy'),
     }),
     [searchParamsString],
   )
