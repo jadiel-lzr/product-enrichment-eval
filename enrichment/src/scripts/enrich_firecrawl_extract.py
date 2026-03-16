@@ -19,6 +19,7 @@ Install:
 
 Usage:
     cd enrichment && python src/scripts/enrich_firecrawl_extract.py
+    cd enrichment && python src/scripts/enrich_firecrawl_extract.py --concurrency 10
 """
 
 import argparse
@@ -27,6 +28,9 @@ import json
 import os
 import sys
 import time
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
@@ -51,8 +55,12 @@ MAX_POLLING_ATTEMPTS = 90
 POLLING_INTERVAL_S = 2.0
 ROW_SLEEP_S = 0.5
 NO_VALID_LINKS = "no valid links"
+DEFAULT_CONCURRENCY = 5
 
 TOOL_NAME = "firecrawl"
+
+# Fields to always re-extract even if already populated
+ALWAYS_EXTRACT = {"title", "made_in"}
 
 # 12 target fields matching ENRICHMENT_TARGET_FIELDS in enriched.ts
 ENRICHMENT_TARGET_FIELDS = [
@@ -159,13 +167,23 @@ HEADERS = {
 }
 
 
+# ── Result type ──────────────────────────────────────────────────────────────
+
+@dataclass
+class RowResult:
+    out_row: dict
+    status: str  # "success" | "skipped" | "failed" | "no_data"
+    credits: int = 0
+    tokens: int = 0
+
+
 # ── Fill rate & status ────────────────────────────────────────────────────────
 
 def compute_fill_rate(row: dict) -> float:
     """Count how many of the 12 target fields have non-empty values, divided by 12."""
     filled = sum(
-        1 for field in ENRICHMENT_TARGET_FIELDS
-        if row.get(field, "").strip()
+        1 for f in ENRICHMENT_TARGET_FIELDS
+        if row.get(f, "").strip()
     )
     return round(filled / len(ENRICHMENT_TARGET_FIELDS), 2)
 
@@ -191,9 +209,9 @@ def create_extract_job(
     Returns (success, job_id, error_message).
     """
     schema_properties = {
-        field: {"type": "string", "description": FIELD_DESCRIPTIONS[field]}
-        for field in empty_fields
-        if field in FIELD_DESCRIPTIONS
+        f: {"type": "string", "description": FIELD_DESCRIPTIONS[f]}
+        for f in empty_fields
+        if f in FIELD_DESCRIPTIONS
     }
 
     payload = {
@@ -295,6 +313,164 @@ def load_completed_skus() -> set[str]:
     return completed
 
 
+# ── Per-row processing (runs in thread) ──────────────────────────────────────
+
+def process_row(row: dict, row_index: int, total: int) -> RowResult:
+    """Process a single row: extract from Firecrawl, return result."""
+    sku = row.get("sku", "?")
+    brand = row.get("brand", "").strip()
+    best_links_raw = row.get("best_product_links", "").strip()
+    prefix = f"[{row_index}/{total}] SKU {sku}"
+
+    # Find empty enrichable fields + always re-extract certain fields
+    empty_fields = [
+        f for f in ENRICHMENT_TARGET_FIELDS
+        if not row.get(f, "").strip() or f in ALWAYS_EXTRACT
+    ]
+
+    if not empty_fields:
+        print(f"{prefix} — no empty fields, skipping")
+        fill_rate = compute_fill_rate(row)
+        return RowResult(
+            out_row={
+                **row,
+                "_enrichment_tool": TOOL_NAME,
+                "_enrichment_status": derive_status(fill_rate, False),
+                "_enrichment_fill_rate": fill_rate,
+                "_enriched_fields": "",
+                "_enrichment_error": "",
+                "_enrichment_accuracy_score": "",
+            },
+            status="skipped",
+        )
+
+    if best_links_raw == NO_VALID_LINKS or not best_links_raw:
+        print(f"{prefix} — no valid links, skipping enrichment")
+        fill_rate = compute_fill_rate(row)
+        return RowResult(
+            out_row={
+                **row,
+                "_enrichment_tool": TOOL_NAME,
+                "_enrichment_status": derive_status(fill_rate, True),
+                "_enrichment_fill_rate": fill_rate,
+                "_enriched_fields": "",
+                "_enrichment_error": "No valid links available",
+                "_enrichment_accuracy_score": "",
+            },
+            status="skipped",
+        )
+
+    # Parse all candidate URLs
+    try:
+        links_data = json.loads(best_links_raw)
+        candidate_urls = [item["link"] for item in links_data if item.get("link")]
+    except (json.JSONDecodeError, KeyError, TypeError) as e:
+        print(f"{prefix} — could not parse best_product_links: {e}")
+        fill_rate = compute_fill_rate(row)
+        return RowResult(
+            out_row={
+                **row,
+                "_enrichment_tool": TOOL_NAME,
+                "_enrichment_status": "failed",
+                "_enrichment_fill_rate": fill_rate,
+                "_enriched_fields": "",
+                "_enrichment_error": f"Parse error: {e}",
+                "_enrichment_accuracy_score": "",
+            },
+            status="failed",
+        )
+
+    if not candidate_urls:
+        print(f"{prefix} — best_product_links parsed but no URLs found")
+        fill_rate = compute_fill_rate(row)
+        return RowResult(
+            out_row={
+                **row,
+                "_enrichment_tool": TOOL_NAME,
+                "_enrichment_status": derive_status(fill_rate, True),
+                "_enrichment_fill_rate": fill_rate,
+                "_enriched_fields": "",
+                "_enrichment_error": "No URLs in best_product_links",
+                "_enrichment_accuracy_score": "",
+            },
+            status="skipped",
+        )
+
+    # Try each link in order, accumulating fills across all links
+    filled_fields: list[str] = []
+    out_row = dict(row)
+    last_err: Optional[str] = None
+    remaining_fields = list(empty_fields)
+    row_credits = 0
+    row_tokens = 0
+
+    for link_idx, url in enumerate(candidate_urls):
+        if not remaining_fields:
+            break
+
+        print(f"{prefix} — link {link_idx + 1}/{len(candidate_urls)}: extracting {remaining_fields} from {url}")
+
+        ok, job_id, err = create_extract_job(url, remaining_fields, brand)
+        if not ok:
+            print(f"{prefix} — job creation failed: {err}")
+            last_err = err or "job creation failed"
+            time.sleep(ROW_SLEEP_S)
+            continue
+
+        print(f"{prefix} — job {job_id}, polling...")
+        ok, extracted, err, credits, tokens = poll_extract_job(job_id)
+        row_credits += credits
+        row_tokens += tokens
+        if credits or tokens:
+            print(f"{prefix} — credits: {credits}, tokens: {tokens}")
+        if not ok:
+            print(f"{prefix} — extraction failed: {err}")
+            last_err = err or "extraction failed"
+            time.sleep(ROW_SLEEP_S)
+            continue
+
+        if extracted:
+            link_fills: list[str] = []
+            for f in list(remaining_fields):
+                value = extracted.get(f)
+                if value and str(value).strip():
+                    out_row[f] = str(value).strip()
+                    link_fills.append(f)
+                    remaining_fields.remove(f)
+            if link_fills:
+                filled_fields.extend(link_fills)
+                print(f"{prefix} — filled from link {link_idx + 1}: {link_fills} (still needed: {remaining_fields})")
+            else:
+                print(f"{prefix} — link {link_idx + 1} returned no usable data, trying next...")
+        else:
+            print(f"{prefix} — link {link_idx + 1} returned no usable data, trying next...")
+
+        time.sleep(ROW_SLEEP_S)
+
+    # Compute metadata
+    fill_rate = compute_fill_rate(out_row)
+    has_error = not filled_fields and last_err is not None
+    out_row["_enrichment_tool"] = TOOL_NAME
+    out_row["_enrichment_status"] = derive_status(fill_rate, has_error)
+    out_row["_enrichment_fill_rate"] = fill_rate
+    out_row["_enriched_fields"] = ",".join(filled_fields)
+    out_row["_enrichment_error"] = last_err if has_error else ""
+    out_row["_enrichment_accuracy_score"] = ""
+
+    if filled_fields:
+        status = "success"
+    else:
+        print(f"{prefix} — all links exhausted, no usable data")
+        status = "no_data"
+
+    return RowResult(
+        out_row=out_row,
+        status=status,
+        credits=row_credits,
+        tokens=row_tokens,
+    )
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def parse_args() -> argparse.Namespace:
@@ -304,6 +480,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--limit", type=int, default=None,
         help="Maximum number of rows to process",
+    )
+    parser.add_argument(
+        "--concurrency", type=int, default=DEFAULT_CONCURRENCY,
+        help=f"Number of rows to process in parallel (default: {DEFAULT_CONCURRENCY})",
     )
     return parser.parse_args()
 
@@ -329,15 +509,16 @@ def main() -> None:
         print(f"Limiting to {len(pending_rows)} rows")
 
     print(f"Rows to process: {len(pending_rows)}")
+    print(f"Concurrency: {args.concurrency}")
 
     if not pending_rows:
         print("Nothing to do.")
         return
 
     # Ensure enriched field columns exist in fieldnames
-    for field in ENRICHMENT_TARGET_FIELDS:
-        if field not in fieldnames:
-            fieldnames.append(field)
+    for f in ENRICHMENT_TARGET_FIELDS:
+        if f not in fieldnames:
+            fieldnames.append(f)
 
     # Ensure metadata columns exist in fieldnames
     for col in METADATA_COLUMNS:
@@ -354,168 +535,49 @@ def main() -> None:
     total_credits = 0
     total_tokens = 0
 
+    write_lock = threading.Lock()
+    total = len(pending_rows)
+
     with open(OUTPUT_CSV, mode, newline="", encoding="utf-8") as out_f:
         writer = csv.DictWriter(out_f, fieldnames=fieldnames)
         if not file_exists:
             writer.writeheader()
 
-        for i, row in enumerate(pending_rows, 1):
-            sku = row.get("sku", "?")
-            brand = row.get("brand", "").strip()
-            best_links_raw = row.get("best_product_links", "").strip()
+        def on_result(result: RowResult) -> None:
+            nonlocal success_count, skipped_count, failed_count, no_data_count
+            nonlocal total_credits, total_tokens
 
-            # Find empty enrichable fields + always re-extract title
-            ALWAYS_EXTRACT = {"title", "made_in"}
-            empty_fields = [
-                f for f in ENRICHMENT_TARGET_FIELDS
-                if not row.get(f, "").strip() or f in ALWAYS_EXTRACT
-            ]
-
-            prefix = f"[{i}/{len(pending_rows)}] SKU {sku}"
-
-            if not empty_fields:
-                print(f"{prefix} — no empty fields, skipping")
-                fill_rate = compute_fill_rate(row)
-                out_row = {
-                    **row,
-                    "_enrichment_tool": TOOL_NAME,
-                    "_enrichment_status": derive_status(fill_rate, False),
-                    "_enrichment_fill_rate": fill_rate,
-                    "_enriched_fields": "",
-                    "_enrichment_error": "",
-                    "_enrichment_accuracy_score": "",
-                }
-                writer.writerow(out_row)
+            with write_lock:
+                writer.writerow(result.out_row)
                 out_f.flush()
-                skipped_count += 1
-                continue
 
-            if best_links_raw == NO_VALID_LINKS or not best_links_raw:
-                print(f"{prefix} — no valid links, skipping enrichment")
-                fill_rate = compute_fill_rate(row)
-                out_row = {
-                    **row,
-                    "_enrichment_tool": TOOL_NAME,
-                    "_enrichment_status": derive_status(fill_rate, True),
-                    "_enrichment_fill_rate": fill_rate,
-                    "_enriched_fields": "",
-                    "_enrichment_error": "No valid links available",
-                    "_enrichment_accuracy_score": "",
-                }
-                writer.writerow(out_row)
-                out_f.flush()
-                skipped_count += 1
-                continue
+                total_credits += result.credits
+                total_tokens += result.tokens
 
-            # Parse all candidate URLs
-            try:
-                links_data = json.loads(best_links_raw)
-                candidate_urls = [item["link"] for item in links_data if item.get("link")]
-            except (json.JSONDecodeError, KeyError, TypeError) as e:
-                print(f"{prefix} — could not parse best_product_links: {e}")
-                fill_rate = compute_fill_rate(row)
-                out_row = {
-                    **row,
-                    "_enrichment_tool": TOOL_NAME,
-                    "_enrichment_status": "failed",
-                    "_enrichment_fill_rate": fill_rate,
-                    "_enriched_fields": "",
-                    "_enrichment_error": f"Parse error: {e}",
-                    "_enrichment_accuracy_score": "",
-                }
-                writer.writerow(out_row)
-                out_f.flush()
-                failed_count += 1
-                continue
+                if result.status == "success":
+                    success_count += 1
+                elif result.status == "skipped":
+                    skipped_count += 1
+                elif result.status == "failed":
+                    failed_count += 1
+                elif result.status == "no_data":
+                    no_data_count += 1
 
-            if not candidate_urls:
-                print(f"{prefix} — best_product_links parsed but no URLs found")
-                fill_rate = compute_fill_rate(row)
-                out_row = {
-                    **row,
-                    "_enrichment_tool": TOOL_NAME,
-                    "_enrichment_status": derive_status(fill_rate, True),
-                    "_enrichment_fill_rate": fill_rate,
-                    "_enriched_fields": "",
-                    "_enrichment_error": "No URLs in best_product_links",
-                    "_enrichment_accuracy_score": "",
-                }
-                writer.writerow(out_row)
-                out_f.flush()
-                skipped_count += 1
-                continue
+        with ThreadPoolExecutor(max_workers=args.concurrency) as executor:
+            futures = {
+                executor.submit(process_row, row, i, total): i
+                for i, row in enumerate(pending_rows, 1)
+            }
 
-            # Try each link in order, accumulating fills across all links
-            # until every missing field is covered or all links are exhausted.
-            filled_fields: list[str] = []
-            out_row = dict(row)
-            last_err: Optional[str] = None
-            remaining_fields = list(empty_fields)
+            for future in as_completed(futures):
+                row_idx = futures[future]
+                try:
+                    result = future.result()
+                    on_result(result)
+                except Exception as e:
+                    print(f"[{row_idx}/{total}] — unexpected error: {e}")
+                    failed_count += 1
 
-            for link_idx, url in enumerate(candidate_urls):
-                if not remaining_fields:
-                    break
-
-                print(f"{prefix} — link {link_idx + 1}/{len(candidate_urls)}: extracting {remaining_fields} from {url}")
-
-                ok, job_id, err = create_extract_job(url, remaining_fields, brand)
-                if not ok:
-                    print(f"{prefix} — job creation failed: {err}")
-                    last_err = err or "job creation failed"
-                    time.sleep(ROW_SLEEP_S)
-                    continue
-
-                print(f"{prefix} — job {job_id}, polling...")
-                ok, extracted, err, credits, tokens = poll_extract_job(job_id)
-                total_credits += credits
-                total_tokens += tokens
-                if credits or tokens:
-                    print(f"{prefix} — credits used: {credits}, tokens used: {tokens} (running totals: {total_credits} credits, {total_tokens} tokens)")
-                if not ok:
-                    print(f"{prefix} — extraction failed: {err}")
-                    last_err = err or "extraction failed"
-                    time.sleep(ROW_SLEEP_S)
-                    continue
-
-                if extracted:
-                    link_fills: list[str] = []
-                    for field in list(remaining_fields):
-                        value = extracted.get(field)
-                        if value and str(value).strip():
-                            out_row[field] = str(value).strip()
-                            link_fills.append(field)
-                            remaining_fields.remove(field)
-                    if link_fills:
-                        filled_fields.extend(link_fills)
-                        print(f"{prefix} — filled from link {link_idx + 1}: {link_fills} (still needed: {remaining_fields})")
-                    else:
-                        print(f"{prefix} — link {link_idx + 1} returned no usable data, trying next...")
-                else:
-                    print(f"{prefix} — link {link_idx + 1} returned no usable data, trying next...")
-
-                time.sleep(ROW_SLEEP_S)
-
-            # Compute metadata
-            fill_rate = compute_fill_rate(out_row)
-            has_error = not filled_fields and last_err is not None
-            out_row["_enrichment_tool"] = TOOL_NAME
-            out_row["_enrichment_status"] = derive_status(fill_rate, has_error)
-            out_row["_enrichment_fill_rate"] = fill_rate
-            out_row["_enriched_fields"] = ",".join(filled_fields)
-            out_row["_enrichment_error"] = last_err if has_error else ""
-            out_row["_enrichment_accuracy_score"] = ""
-
-            if filled_fields:
-                success_count += 1
-            else:
-                print(f"{prefix} — all links exhausted, no usable data")
-                no_data_count += 1
-
-            writer.writerow(out_row)
-            out_f.flush()
-            time.sleep(ROW_SLEEP_S)
-
-    total = len(pending_rows)
     print(f"\nDone. {total} rows processed.")
     print(f"  success:          {success_count}")
     print(f"  no_data:          {no_data_count}")
