@@ -1,0 +1,9 @@
+{
+  "totalInput": 500,
+  "totalOutput": 500,
+  "removed": [],
+  "normalizationsApplied": {
+    "colors": 500,
+    "titles": 0
+  }
+}

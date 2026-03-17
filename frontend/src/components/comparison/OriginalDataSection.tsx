@@ -36,6 +36,20 @@ export function OriginalDataSection({ product }: OriginalDataSectionProps) {
       </button>
       {expanded && (
         <div className="space-y-1 border-t border-gray-200 px-4 py-3">
+          {[
+            { key: 'feed_name', label: 'Feed Name' },
+            { key: 'code', label: 'Code' },
+            { key: 'model', label: 'Model' },
+          ].map(({ key, label }) => (
+            <div key={key} className="flex items-start gap-3 py-1">
+              <span className="w-28 shrink-0 text-xs font-medium text-gray-500">
+                {label}
+              </span>
+              <span className="min-w-0 flex-1 text-sm text-gray-700">
+                {getOriginalFieldValue(product, key) || <span className="italic text-gray-400">Empty</span>}
+              </span>
+            </div>
+          ))}
           {CORE_ENRICHMENT_FIELDS.map((field) => {
             const value = getOriginalFieldValue(product, field)
             return (

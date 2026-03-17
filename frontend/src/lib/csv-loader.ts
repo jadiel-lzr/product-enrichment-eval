@@ -125,6 +125,12 @@ function buildToolEnrichment(
     }
   }
 
+  const rawImageLinks = row['image_links']?.trim() ?? ''
+  const imageLinks = rawImageLinks
+    ? rawImageLinks.split('|').map((url) => url.trim()).filter(Boolean)
+    : undefined
+  const sourceUrl = row['source_url']?.trim() || undefined
+
   return {
     sku,
     tool,
@@ -136,6 +142,8 @@ function buildToolEnrichment(
     totalFields: CORE_ENRICHMENT_FIELDS.length,
     enrichedValues,
     originalValues,
+    imageLinks: imageLinks && imageLinks.length > 0 ? imageLinks : undefined,
+    sourceUrl,
   }
 }
 

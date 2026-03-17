@@ -86,6 +86,68 @@ export function EnrichmentCard({ enrichment, product }: EnrichmentCardProps) {
         })}
       </div>
 
+      {enrichment.sourceUrl ? (
+        <div className="mt-4 space-y-2 border-t border-gray-100 pt-4">
+          <div className="flex items-start gap-3">
+            <span className="w-28 shrink-0 text-xs font-medium text-gray-500">
+              Image(s) Source Url
+            </span>
+            <a
+              href={enrichment.sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="min-w-0 flex-1 truncate text-sm text-blue-600 hover:text-blue-800 hover:underline"
+            >
+              {enrichment.sourceUrl}
+            </a>
+          </div>
+        </div>
+      ) : null}
+
+      {enrichment.imageLinks && enrichment.imageLinks.length > 0 ? (
+        <div className="mt-4 space-y-3 border-t border-gray-100 pt-4">
+          <span className="text-xs font-medium text-gray-500">
+            Enriched Images ({enrichment.imageLinks.length})
+          </span>
+          <div className="grid grid-cols-2 gap-2">
+            {enrichment.imageLinks.map((url) => (
+              <a
+                key={url}
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="overflow-hidden rounded-lg border border-gray-200 bg-gray-50 transition hover:border-blue-300 hover:shadow-sm"
+              >
+                <img
+                  src={url}
+                  alt="Enriched product"
+                  className="h-32 w-full object-contain"
+                  onError={(e) => {
+                    const target = e.currentTarget
+                    target.style.display = 'none'
+                    const fallback = target.nextElementSibling
+                    if (fallback instanceof HTMLElement) {
+                      fallback.style.display = 'flex'
+                    }
+                  }}
+                />
+                <div className="hidden h-32 w-full flex-col items-center justify-center gap-1 text-gray-400">
+                  <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
+                    />
+                  </svg>
+                  <span className="text-xs">Failed to load</span>
+                </div>
+              </a>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       {additionalFields.length > 0 ? (
         <div className="mt-4 border-t border-gray-100 pt-4">
           <button
