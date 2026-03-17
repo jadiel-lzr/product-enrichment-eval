@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { useProducts } from '@/context/ProductContext'
-import { EMPTY_FILTERS, TOOL_DISPLAY_NAMES, type ToolName } from '@/types/enrichment'
+import { EMPTY_FILTERS, TOOL_DISPLAY_NAMES } from '@/types/enrichment'
 import { FilterDropdown } from './FilterDropdown'
 
 const ENRICHED_BY_OPTIONS = ['all', 'claude', 'firecrawl', 'gemini', 'gpt'] as const

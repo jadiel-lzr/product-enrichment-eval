@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { loadAllData, type LoadedData } from '@/lib/csv-loader'
 import type { Product, ToolEnrichment } from '@/types/enrichment'
+import type { DatasetConfig } from '@/types/dataset'
 
 interface ProductDataState {
   readonly products: Product[]
@@ -16,15 +17,16 @@ const INITIAL_STATE: ProductDataState = {
   error: null,
 }
 
-export function useProductData(): ProductDataState {
+export function useProductData(config: DatasetConfig): ProductDataState {
   const [state, setState] = useState<ProductDataState>(INITIAL_STATE)
 
   useEffect(() => {
     let cancelled = false
+    setState(INITIAL_STATE)
 
     async function load() {
       try {
-        const data: LoadedData = await loadAllData()
+        const data: LoadedData = await loadAllData(config)
         if (cancelled) return
 
         setState({
@@ -50,7 +52,7 @@ export function useProductData(): ProductDataState {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [config.id])
 
   return state
 }

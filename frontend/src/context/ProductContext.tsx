@@ -17,6 +17,7 @@ import {
   type ToolEnrichment,
   type ToolName,
 } from '@/types/enrichment'
+import type { DatasetConfig } from '@/types/dataset'
 
 interface ProductContextValue {
   readonly products: Product[]
@@ -70,11 +71,12 @@ function extractUniqueSorted(products: Product[], key: keyof Product): string[] 
 }
 
 interface ProductProviderProps {
+  readonly dataset: DatasetConfig
   readonly children: ReactNode
 }
 
-export function ProductProvider({ children }: ProductProviderProps) {
-  const { products, enrichmentsByProduct, loading, error } = useProductData()
+export function ProductProvider({ dataset, children }: ProductProviderProps) {
+  const { products, enrichmentsByProduct, loading, error } = useProductData(dataset)
   const { urlSku, urlFilters, setUrlSku, setUrlFilters } = useUrlParams()
   const [selectedSku, setSelectedSkuState] = useState<string | null>(
     () => urlSku,

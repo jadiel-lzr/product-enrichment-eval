@@ -8,6 +8,7 @@ import {
   type ToolEnrichment,
   type ToolName,
 } from '@/types/enrichment'
+import type { DatasetConfig } from '@/types/dataset'
 
 const JSON_COLUMNS = ['images', 'gtin', 'sizes', 'errors'] as const
 
@@ -50,13 +51,14 @@ async function loadCSV(path: string): Promise<Record<string, string>[]> {
   })
 }
 
-export async function loadProductCSV(): Promise<Product[]> {
-  const rows = await loadCSV('/data/base.csv')
+export async function loadProductCSV(config: DatasetConfig): Promise<Product[]> {
+  const rows = await loadCSV(config.baseCsvPath)
   const products: Product[] = []
 
   for (const raw of rows) {
     try {
-      const transformed = parseRow(raw)
+      const normalized = config.normalizeRow ? config.normalizeRow(raw) : raw
+      const transformed = parseRow(normalized)
       const product = ProductSchema.parse(transformed)
       products.push(product)
     } catch (error) {
@@ -139,8 +141,9 @@ function buildToolEnrichment(
 
 export async function loadEnrichedCSV(
   tool: ToolName,
+  prefix: string = 'enriched',
 ): Promise<ToolEnrichment[]> {
-  const rows = await loadCSV(`/data/enriched-${tool}.csv`)
+  const rows = await loadCSV(`/data/${prefix}-${tool}.csv`)
   if (rows.length === 0) return []
 
   return rows.map((row) => buildToolEnrichment(row, tool))
@@ -151,10 +154,10 @@ export interface LoadedData {
   readonly enrichments: Map<string, ToolEnrichment[]>
 }
 
-export async function loadAllData(): Promise<LoadedData> {
+export async function loadAllData(config: DatasetConfig): Promise<LoadedData> {
   const [productsResult, ...enrichmentResults] = await Promise.allSettled([
-    loadProductCSV(),
-    ...TOOL_NAMES.map((tool) => loadEnrichedCSV(tool)),
+    loadProductCSV(config),
+    ...TOOL_NAMES.map((tool) => loadEnrichedCSV(tool, config.enrichedCsvPrefix)),
   ])
 
   const products =
