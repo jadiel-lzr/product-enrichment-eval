@@ -59,23 +59,19 @@ interface SearchTier {
 }
 
 function buildSearchTiers(product: Product): readonly SearchTier[] {
-  return [
-    {
-      name: 'supplier+brand',
-      domains: getTier1Domains(product),
-      maxUses: 3,
-    },
-    {
-      name: 'retailers',
-      domains: getTier2Domains(),
-      maxUses: 3,
-    },
-    {
-      name: 'unrestricted',
-      domains: undefined,
-      maxUses: 5,
-    },
-  ]
+  const tier1 = getTier1Domains(product)
+  const tiers: SearchTier[] = []
+
+  if (tier1 && tier1.length > 0) {
+    tiers.push({ name: 'supplier+brand', domains: tier1, maxUses: 3 })
+  }
+
+  tiers.push(
+    { name: 'retailers', domains: getTier2Domains(), maxUses: 3 },
+    { name: 'unrestricted', domains: undefined, maxUses: 5 },
+  )
+
+  return tiers
 }
 
 function buildWebSearchTool(tier: SearchTier): WebSearchTool {
@@ -94,29 +90,31 @@ function buildSearchPrompt(product: Product): string {
   const colorEng = translateColor(product.color_original || product.color)
   const searchHint = [brand, code, name, colorEng].filter((p) => p.length > 0).join(' ')
 
-  return `Find the product page for this luxury fashion item and extract product details.
+  return `Find the specific product page URL for: ${searchHint}
 
-## Product Identity
-- **Brand:** ${brand}
-- **Name:** ${name}
-- **Code/Model:** ${code}
-- **Color:** ${colorEng || product.color}
-- **Category:** ${product.category}
-- **SKU:** ${product.sku}
+If "${code}" doesn't work, try: ${brand} ${name} ${colorEng} buy
 
-## Search Strategy
-1. Search for: \`${searchHint}\`
-2. If that fails, try: \`${brand} "${code}"\` or \`${brand} ${name} ${colorEng} buy\`
-3. Find a **specific product page** (NOT a collection or category page)
-4. Prefer official brand sites and major retailers (farfetch, ssense, mytheresa, net-a-porter)
+Return ONLY a JSON object, no markdown:
+{"product_page_url": "https://...", "confidence_score": "high|medium|low|none"}`
+}
 
-## What to Return
-Return a JSON object with:
-- \`product_page_url\`: The specific product page URL you found. Empty string if not found.
-- \`confidence_score\`: "high" (exact product match on official/major site), "medium" (likely match on secondary retailer), "low" (uncertain), "none" (not found)
-- Fill in any product details you find: title, description_eng, season, year, collection, materials, made_in, color, dimensions, weight, gtin, additional_info, accuracy_score
-
-Return ONLY valid JSON. No markdown, no explanation.`
+async function verifyUrl(url: string): Promise<boolean> {
+  try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 8_000)
+    const response = await fetch(url, {
+      method: 'HEAD',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      },
+      signal: controller.signal,
+      redirect: 'follow',
+    })
+    clearTimeout(timeout)
+    return response.ok
+  } catch {
+    return false
+  }
 }
 
 async function extractImageFromPage(url: string): Promise<string | undefined> {
@@ -344,17 +342,25 @@ export function createNoImgClaudeAdapter(): EnrichmentAdapter {
           const foundUrl = typeof parsed.product_page_url === 'string' ? parsed.product_page_url.trim() : ''
           const confidence = typeof parsed.confidence_score === 'string' ? parsed.confidence_score : 'none'
 
-          // Remove search-only fields before merging into enrichment fields
-          const { product_page_url: _url, ...enrichmentFields } = parsed
-          bestFields = mergeResults(bestFields, normalizeFields(enrichmentFields))
+          // TODO: re-enable enrichment field merging when Pass 2 enrichment is added
+          // const { product_page_url: _url, ...enrichmentFields } = parsed
+          // bestFields = mergeResults(bestFields, normalizeFields(enrichmentFields))
 
-          if (foundUrl && confidence !== 'none') {
-            productPageUrl = foundUrl
-            bestFields.source_url = foundUrl
+          if (foundUrl && (confidence === 'high' || confidence === 'medium')) {
+            // Validate URL is reachable before accepting
+            const isLive = await verifyUrl(foundUrl)
+            if (isLive) {
+              productPageUrl = foundUrl
+              bestFields.source_url = foundUrl
+              bestFields.confidence_score = confidence
+              console.log(
+                `[noimg-claude] ${product.sku} tier=${tier.name}: found ${foundUrl} (${confidence})`,
+              )
+              break
+            }
             console.log(
-              `[noimg-claude] ${product.sku} tier=${tier.name}: found product page (${confidence})`,
+              `[noimg-claude] ${product.sku} tier=${tier.name}: URL returned non-200, skipping: ${foundUrl}`,
             )
-            break
           }
 
           console.log(
