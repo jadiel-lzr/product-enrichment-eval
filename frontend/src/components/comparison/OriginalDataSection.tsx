@@ -37,6 +37,7 @@ export function OriginalDataSection({ product }: OriginalDataSectionProps) {
       {expanded && (
         <div className="space-y-1 border-t border-gray-200 px-4 py-3">
           {[
+            { key: 'name', label: 'Name' },
             { key: 'feed_name', label: 'Feed Name' },
             { key: 'code', label: 'Code' },
             { key: 'model', label: 'Model' },

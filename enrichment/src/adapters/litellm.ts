@@ -42,6 +42,7 @@ export function createLiteLLMClient(tool: LiteLLMTool): OpenAI {
   return new OpenAI({
     apiKey: getFirstNonEmptyEnv(apiKeyEnvKeys),
     baseURL: resolveLiteLLMBaseUrl(tool),
+    timeout: 120_000,
   })
 }
 
