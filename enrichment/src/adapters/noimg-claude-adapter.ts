@@ -39,15 +39,15 @@ Search: ${searchHint}${siteNote}
 
 RULES:
 - Only return a URL for a specific product page (NOT a collection, category, or brand page)
-- The page must be for this exact product: correct brand, matching product name or code, correct color
-- "high" = product code "${code}" appears in the URL or page, on official site or major retailer
-- "medium" = product name and brand match on a retailer, but code may not be in URL
-- "low" = uncertain match
-- "none" = no match found
+- The page must have product images and details — an out-of-stock page with no images is NOT a match
+- "high" = exact product code "${code}" in URL or page + exact color match + has product images
+- "medium" = brand and product name match + close color (e.g. "dark brown" vs "brown") + has product images
+- "none" = no match, wrong color entirely, or page has no product images/info
+- If you find the right product but in a DIFFERENT COLOR (e.g. looking for black, found red), return "none"
 - Do NOT guess or fabricate URLs — only return URLs from actual search results
 
 Return ONLY JSON, no markdown, no explanation:
-{"product_page_url": "...", "confidence_score": "high|medium|low|none"}`
+{"product_page_url": "...", "confidence_score": "high|medium|none", "match_reason": "brief explanation of why this is a match — what code/name/color matched"}`
 }
 
 async function verifyUrl(url: string): Promise<boolean> {
@@ -221,7 +221,7 @@ export function createNoImgClaudeAdapter(): EnrichmentAdapter {
           tools: [webSearchTool],
         }
 
-        let bestFields: Record<string, unknown> = {}
+        let enrichedFields: Record<string, unknown> = {}
 
         let response: { choices: readonly { message?: { content?: string | null } }[] }
         try {
@@ -274,33 +274,37 @@ export function createNoImgClaudeAdapter(): EnrichmentAdapter {
 
         const foundUrl = typeof parsed.product_page_url === 'string' ? parsed.product_page_url.trim() : ''
         const confidence = typeof parsed.confidence_score === 'string' ? parsed.confidence_score : 'none'
+        const matchReason = typeof parsed.match_reason === 'string' ? parsed.match_reason : ''
 
         if (foundUrl && (confidence === 'high' || confidence === 'medium')) {
           const isLive = await verifyUrl(foundUrl)
           if (isLive) {
-            bestFields.source_url = foundUrl
-            bestFields.confidence_score = confidence
-            console.log(`[noimg-claude] ${product.sku}: verified ${foundUrl} (${confidence})`)
+            enrichedFields.source_url = foundUrl
+            enrichedFields.confidence_score = confidence
+            enrichedFields.match_reason = matchReason
+            console.log(`[noimg-claude] ${product.sku}: verified ${foundUrl} (${confidence}) — ${matchReason}`)
           } else {
             console.log(`[noimg-claude] ${product.sku}: URL returned non-200: ${foundUrl}`)
-            bestFields.confidence_score = 'none'
+            enrichedFields.confidence_score = 'none'
+            enrichedFields.match_reason = `URL returned non-200: ${foundUrl}`
           }
         } else {
-          console.log(`[noimg-claude] ${product.sku}: no match (${confidence})`)
-          bestFields.confidence_score = confidence
+          console.log(`[noimg-claude] ${product.sku}: no match (${confidence})${matchReason ? ` — ${matchReason}` : ''}`)
+          enrichedFields.confidence_score = confidence
+          if (matchReason) enrichedFields.match_reason = matchReason
         }
 
         // --- Pass 2: Fetch the product page and extract og:image ---
         // DISABLED FOR TESTING — enable when Pass 1 results are validated
-        // if (bestFields.source_url) {
-        //   const imageUrl = await extractImageFromPage(bestFields.source_url as string)
+        // if (enrichedFields.source_url) {
+        //   const imageUrl = await extractImageFromPage(enrichedFields.source_url as string)
         //   if (imageUrl) {
-        //     bestFields.image_links = imageUrl
+        //     enrichedFields.image_links = imageUrl
         //     console.log(`[noimg-claude] ${product.sku}: extracted image URL`)
         //   }
         // }
 
-        if (Object.keys(bestFields).length === 0) {
+        if (Object.keys(enrichedFields).length === 0) {
           return {
             fields: {},
             status: 'failed',
@@ -310,7 +314,7 @@ export function createNoImgClaudeAdapter(): EnrichmentAdapter {
           }
         }
 
-        return buildResult(bestFields)
+        return buildResult(enrichedFields)
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
         return {
