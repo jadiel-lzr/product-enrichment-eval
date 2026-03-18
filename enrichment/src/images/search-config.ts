@@ -1,5 +1,3 @@
-import type { Product } from '../types/product.js'
-
 /**
  * Brand → official website domain mapping.
  * Keys are UPPERCASE brand names as they appear in the feed.
@@ -132,35 +130,6 @@ export function correctBrand(brand: string): string {
   return BRAND_CORRECTIONS[upper] ?? brand
 }
 
-/**
- * Build Tier 1 domains: feed supplier + brand's own site.
- * Returns only domains relevant to this specific product.
- */
-export function getTier1Domains(product: Product): readonly string[] | undefined {
-  const domains: string[] = []
-
-  // Add feed supplier domain
-  const feedName = (product as Record<string, unknown>).feed_name
-  if (typeof feedName === 'string' && feedName.trim().length > 0) {
-    const supplierDomain = FEED_SUPPLIER_DOMAINS[feedName.trim().toLowerCase()]
-    if (supplierDomain) {
-      domains.push(supplierDomain)
-    }
-  }
-
-  // Add brand's own domain
-  const brandUpper = product.brand.toUpperCase().trim()
-  const brandDomain = BRAND_DOMAINS[brandUpper]
-  if (brandDomain) {
-    domains.push(brandDomain)
-  }
-
-  return domains.length > 0 ? domains : undefined
-}
-
-/**
- * Tier 2: major multi-brand retailers.
- */
-export function getTier2Domains(): readonly string[] {
-  return RETAILER_DOMAINS
-}
+// getTier1Domains and getTier2Domains removed — single unrestricted search now used.
+// BRAND_DOMAINS and FEED_SUPPLIER_DOMAINS are still used by the adapter to build
+// search hints (e.g. "also try site:dolcegabbana.com").

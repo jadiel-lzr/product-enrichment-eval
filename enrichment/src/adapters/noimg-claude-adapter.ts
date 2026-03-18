@@ -1,101 +1,53 @@
-import { zodToJsonSchema } from 'zod-to-json-schema'
 import { ENRICHMENT_TARGET_FIELDS } from '../types/enriched.js'
 import { NoImgEnrichedFieldsSchema } from '../types/noimg-enriched.js'
 import { withRetry } from '../batch/retry.js'
 import { computeFillRate, type EnrichmentAdapter, type EnrichmentResult } from './types.js'
 import {
-  buildOpenAIJsonSchemaResponseFormat,
   createLiteLLMClient,
   tryParseJsonContent,
 } from './litellm.js'
 import type { Product } from '../types/product.js'
-import { getTier1Domains, getTier2Domains, translateColor, correctBrand } from '../images/search-config.js'
+import { translateColor, correctBrand, BRAND_DOMAINS, FEED_SUPPLIER_DOMAINS } from '../images/search-config.js'
 
-const DEFAULT_MODEL = 'anthropic/claude-opus-4-5-20251101'
 const DEFAULT_SEARCH_MODEL = 'anthropic/claude-sonnet-4-6'
 const MAX_TOKENS = 4096
-
-// Simple schema for Pass 1: just find URLs + basic metadata
-const SEARCH_RESULT_SCHEMA = {
-  type: 'object' as const,
-  properties: {
-    product_page_url: { type: 'string' as const, description: 'The specific product page URL found' },
-    title: { type: 'string' as const, description: 'Actual product name from the page' },
-    description_eng: { type: 'string' as const, description: 'Product description, 2-3 sentences' },
-    season: { type: 'string' as const },
-    year: { type: 'string' as const },
-    collection: { type: 'string' as const },
-    gtin: { type: 'string' as const },
-    dimensions: { type: 'string' as const },
-    made_in: { type: 'string' as const },
-    materials: { type: 'string' as const },
-    weight: { type: 'string' as const },
-    color: { type: 'string' as const, description: 'Clean English color name' },
-    additional_info: { type: 'string' as const },
-    accuracy_score: { type: 'integer' as const, minimum: 1, maximum: 10 },
-    confidence_score: { type: 'string' as const, enum: ['high', 'medium', 'low', 'none'] },
-  },
-  required: ['product_page_url', 'confidence_score'] as const,
-  additionalProperties: false,
-}
-
-// Full schema for final output
-const NOIMG_JSON_SCHEMA = {
-  ...zodToJsonSchema(NoImgEnrichedFieldsSchema) as Record<string, unknown>,
-  additionalProperties: false,
-}
-
-interface WebSearchTool {
-  readonly type: string
-  readonly name: 'web_search'
-  readonly max_uses: number
-  readonly allowed_domains?: readonly string[]
-}
-
-interface SearchTier {
-  readonly name: string
-  readonly domains: readonly string[] | undefined
-  readonly maxUses: number
-}
-
-function buildSearchTiers(product: Product): readonly SearchTier[] {
-  const tier1 = getTier1Domains(product)
-  const tiers: SearchTier[] = []
-
-  if (tier1 && tier1.length > 0) {
-    tiers.push({ name: 'supplier+brand', domains: tier1, maxUses: 3 })
-  }
-
-  tiers.push(
-    { name: 'retailers', domains: getTier2Domains(), maxUses: 3 },
-    { name: 'unrestricted', domains: undefined, maxUses: 5 },
-  )
-
-  return tiers
-}
-
-function buildWebSearchTool(tier: SearchTier): WebSearchTool {
-  return {
-    type: 'web_search_20250305',
-    name: 'web_search',
-    max_uses: tier.maxUses,
-    ...(tier.domains ? { allowed_domains: tier.domains } : {}),
-  }
-}
 
 function buildSearchPrompt(product: Product): string {
   const brand = correctBrand(product.brand)
   const code = product.model || product.code || ''
   const name = product.name || ''
   const colorEng = translateColor(product.color_original || product.color)
-  const searchHint = [brand, code, name, colorEng].filter((p) => p.length > 0).join(' ')
+  const feedName = (product as Record<string, unknown>).feed_name as string ?? ''
 
-  return `Find the specific product page URL for: ${searchHint}
+  const searchHint = [brand, `"${code}"`, name, colorEng].filter((p) => p.length > 0).join(' ')
 
-If "${code}" doesn't work, try: ${brand} ${name} ${colorEng} buy
+  // Build supplier/brand site hints
+  const siteHints: string[] = []
+  const supplierDomain = FEED_SUPPLIER_DOMAINS[feedName.trim().toLowerCase()]
+  if (supplierDomain) siteHints.push(supplierDomain)
+  const brandDomain = BRAND_DOMAINS[product.brand.toUpperCase().trim()]
+  if (brandDomain) siteHints.push(brandDomain)
+  const siteNote = siteHints.length > 0
+    ? `\nAlso try: ${siteHints.map((d) => `site:${d}`).join(' or ')}`
+    : ''
 
-Return ONLY a JSON object, no markdown:
-{"product_page_url": "https://...", "confidence_score": "high|medium|low|none"}`
+  return `Find the specific product page URL for this fashion product.
+
+Product: ${brand} "${name}" | Code: ${code} | Color: ${colorEng || product.color} | Category: ${product.category}
+
+Search: ${searchHint}${siteNote}
+
+RULES:
+- Only return a URL for a specific product page (NOT a collection, category, or brand page)
+- The page must be for this exact product: correct brand, matching product name or code, correct color
+- "high" = product code "${code}" appears in the URL or page, on official site or major retailer
+- "medium" = product name and brand match on a retailer, but code may not be in URL
+- "low" = uncertain match
+- "none" = no match found
+- Do NOT guess or fabricate URLs — only return URLs from actual search results
+
+Return ONLY JSON, no markdown, no explanation:
+{"product_page_url": "...", "confidence_score": "high|medium|low|none"}`
 }
 
 async function verifyUrl(url: string): Promise<boolean> {
@@ -202,17 +154,9 @@ function getEnrichedFieldNames(fields: Record<string, unknown>): readonly string
   })
 }
 
-/**
- * Normalize raw LLM response fields before Zod validation.
- * Handles common response quirks:
- * - additional_info as object → JSON string
- * - accuracy_score as string → number
- * - null values → undefined (so Zod .optional() works)
- */
 function normalizeFields(raw: Record<string, unknown>): Record<string, unknown> {
   const normalized = { ...raw }
 
-  // Stringify any object/array values in string fields
   for (const key of Object.keys(normalized)) {
     const value = normalized[key]
     if (value === null) {
@@ -222,7 +166,6 @@ function normalizeFields(raw: Record<string, unknown>): Record<string, unknown> 
     }
   }
 
-  // Coerce accuracy_score to integer
   if (normalized.accuracy_score !== undefined) {
     const score = Number(normalized.accuracy_score)
     normalized.accuracy_score = Number.isFinite(score) ? Math.round(score) : undefined
@@ -246,21 +189,6 @@ function buildResult(fields: Record<string, unknown>): EnrichmentResult {
   }
 }
 
-function mergeResults(
-  previous: Record<string, unknown>,
-  current: Record<string, unknown>,
-): Record<string, unknown> {
-  const merged = { ...previous }
-
-  for (const [key, value] of Object.entries(current)) {
-    if (value !== undefined && value !== '') {
-      merged[key] = value
-    }
-  }
-
-  return merged
-}
-
 export function createNoImgClaudeAdapter(): EnrichmentAdapter {
   const client = createLiteLLMClient('claude')
   const searchModel = process.env.NOIMG_SEARCH_MODEL ?? DEFAULT_SEARCH_MODEL
@@ -271,120 +199,104 @@ export function createNoImgClaudeAdapter(): EnrichmentAdapter {
     async enrich(product: Product): Promise<EnrichmentResult> {
       try {
         const searchPrompt = buildSearchPrompt(product)
-        const tiers = buildSearchTiers(product)
-
-        let bestFields: Record<string, unknown> = {}
-        let productPageUrl = ''
 
         console.log(`[noimg-claude] ${product.sku}: search prompt:\n${searchPrompt}\n`)
 
-        // --- Pass 1: Search for product page URL + metadata ---
-        for (const tier of tiers) {
-          const webSearchTool = buildWebSearchTool(tier)
-          console.log(`[noimg-claude] ${product.sku} tier=${tier.name}: domains=${tier.domains ? tier.domains.join(',') : 'unrestricted'}, maxUses=${tier.maxUses}`)
+        // Single unrestricted web search — no domain restrictions
+        const webSearchTool = {
+          type: 'web_search_20250305',
+          name: 'web_search' as const,
+          max_uses: 5,
+        }
 
-          // No response_format — web_search + JSON schema combined triggers
-          // "Schema is too complex" on Anthropic's API. We ask for JSON in
-          // the prompt instead and parse it ourselves.
-          const createParams = {
-            model: searchModel,
-            max_tokens: MAX_TOKENS,
-            messages: [
-              {
-                role: 'user' as const,
-                content: searchPrompt,
-              },
-            ],
-            tools: [webSearchTool],
-          }
+        const createParams = {
+          model: searchModel,
+          max_tokens: MAX_TOKENS,
+          messages: [
+            {
+              role: 'user' as const,
+              content: searchPrompt,
+            },
+          ],
+          tools: [webSearchTool],
+        }
 
-          let response: { choices: readonly { message?: { content?: string | null } }[] }
-          try {
-            response = await withRetry(
-              async () => {
-                const completion = await client.chat.completions.create(
-                  createParams as unknown as Parameters<typeof client.chat.completions.create>[0],
-                )
-                return completion as { choices: readonly { message?: { content?: string | null } }[] }
-              },
-              `noimg-claude-${tier.name}:${product.sku}`,
-            )
-          } catch (error) {
-            const msg = error instanceof Error ? error.message : String(error)
-            if (msg.includes('not accessible to our user agent') || msg.includes('400')) {
-              console.log(
-                `[noimg-claude] ${product.sku} tier=${tier.name}: domain blocked, skipping`,
+        let bestFields: Record<string, unknown> = {}
+
+        let response: { choices: readonly { message?: { content?: string | null } }[] }
+        try {
+          response = await withRetry(
+            async () => {
+              const completion = await client.chat.completions.create(
+                createParams as unknown as Parameters<typeof client.chat.completions.create>[0],
               )
-              continue
-            }
-            throw error
-          }
-
-          const content = response.choices[0]?.message?.content
-          if (!content) {
-            console.log(
-              `[noimg-claude] ${product.sku} tier=${tier.name}: no response`,
-            )
-            continue
-          }
-
-          console.log(`[noimg-claude] ${product.sku} tier=${tier.name}: raw response:\n${content}\n`)
-
-          const parsed = tryParseJsonContent(content)
-          if (!parsed) {
-            console.log(
-              `[noimg-claude] ${product.sku} tier=${tier.name}: failed to parse JSON`,
-            )
-            continue
-          }
-
-          // Extract product page URL before merging
-          const foundUrl = typeof parsed.product_page_url === 'string' ? parsed.product_page_url.trim() : ''
-          const confidence = typeof parsed.confidence_score === 'string' ? parsed.confidence_score : 'none'
-
-          // TODO: re-enable enrichment field merging when Pass 2 enrichment is added
-          // const { product_page_url: _url, ...enrichmentFields } = parsed
-          // bestFields = mergeResults(bestFields, normalizeFields(enrichmentFields))
-
-          if (foundUrl && (confidence === 'high' || confidence === 'medium')) {
-            // Validate URL is reachable before accepting
-            const isLive = await verifyUrl(foundUrl)
-            if (isLive) {
-              productPageUrl = foundUrl
-              bestFields.source_url = foundUrl
-              bestFields.confidence_score = confidence
-              console.log(
-                `[noimg-claude] ${product.sku} tier=${tier.name}: found ${foundUrl} (${confidence})`,
-              )
-              break
-            }
-            console.log(
-              `[noimg-claude] ${product.sku} tier=${tier.name}: URL returned non-200, skipping: ${foundUrl}`,
-            )
-          }
-
-          console.log(
-            `[noimg-claude] ${product.sku} tier=${tier.name}: no product page found, trying next tier`,
+              return completion as { choices: readonly { message?: { content?: string | null } }[] }
+            },
+            `noimg-claude:${product.sku}`,
           )
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : String(error)
+          console.log(`[noimg-claude] ${product.sku}: search failed: ${msg}`)
+          return {
+            fields: {},
+            status: 'failed',
+            fillRate: 0,
+            enrichedFields: [],
+            error: msg,
+          }
+        }
+
+        const content = response.choices[0]?.message?.content
+        if (!content) {
+          console.log(`[noimg-claude] ${product.sku}: no response content`)
+          return {
+            fields: {},
+            status: 'failed',
+            fillRate: 0,
+            enrichedFields: [],
+            error: 'Empty response from search',
+          }
+        }
+
+        console.log(`[noimg-claude] ${product.sku}: raw response:\n${content}\n`)
+
+        const parsed = tryParseJsonContent(content)
+        if (!parsed) {
+          console.log(`[noimg-claude] ${product.sku}: failed to parse JSON`)
+          return {
+            fields: {},
+            status: 'failed',
+            fillRate: 0,
+            enrichedFields: [],
+            error: 'Failed to parse JSON from search response',
+          }
+        }
+
+        const foundUrl = typeof parsed.product_page_url === 'string' ? parsed.product_page_url.trim() : ''
+        const confidence = typeof parsed.confidence_score === 'string' ? parsed.confidence_score : 'none'
+
+        if (foundUrl && (confidence === 'high' || confidence === 'medium')) {
+          const isLive = await verifyUrl(foundUrl)
+          if (isLive) {
+            bestFields.source_url = foundUrl
+            bestFields.confidence_score = confidence
+            console.log(`[noimg-claude] ${product.sku}: verified ${foundUrl} (${confidence})`)
+          } else {
+            console.log(`[noimg-claude] ${product.sku}: URL returned non-200: ${foundUrl}`)
+            bestFields.confidence_score = 'none'
+          }
+        } else {
+          console.log(`[noimg-claude] ${product.sku}: no match (${confidence})`)
+          bestFields.confidence_score = confidence
         }
 
         // --- Pass 2: Fetch the product page and extract og:image ---
         // DISABLED FOR TESTING — enable when Pass 1 results are validated
-        // if (productPageUrl) {
-        //   console.log(
-        //     `[noimg-claude] ${product.sku}: fetching image from ${productPageUrl}`,
-        //   )
-        //   const imageUrl = await extractImageFromPage(productPageUrl)
-        //
+        // if (bestFields.source_url) {
+        //   const imageUrl = await extractImageFromPage(bestFields.source_url as string)
         //   if (imageUrl) {
         //     bestFields.image_links = imageUrl
-        //     console.log(
-        //       `[noimg-claude] ${product.sku}: extracted image URL`,
-        //     )
-        //   } else {
-        //     console.log(
-        //       `[noimg-claude] ${product.sku}: no image extracted from page`,
-        //     )
+        //     console.log(`[noimg-claude] ${product.sku}: extracted image URL`)
         //   }
         // }
 
@@ -394,7 +306,7 @@ export function createNoImgClaudeAdapter(): EnrichmentAdapter {
             status: 'failed',
             fillRate: 0,
             enrichedFields: [],
-            error: 'No usable response from any search tier',
+            error: 'No usable response from search',
           }
         }
 
