@@ -24,6 +24,18 @@ if (existsSync(envPath)) {
   loadEnvFile(envPath)
 }
 
+function parseSkuArg(args: readonly string[]): string[] | undefined {
+  const skuIndex = args.indexOf('--sku')
+  if (skuIndex === -1) return undefined
+
+  const value = args[skuIndex + 1]
+  if (!value) {
+    console.error('--sku requires a comma-separated list of SKUs')
+    return undefined
+  }
+  return value.split(',').map((s) => s.trim()).filter(Boolean)
+}
+
 function parseLimitArg(args: readonly string[]): number | undefined {
   const limitIndex = args.indexOf('--limit')
   if (limitIndex === -1) return undefined
@@ -41,18 +53,25 @@ async function main(): Promise<void> {
   mkdirSync(reportsDir, { recursive: true })
 
   const limit = parseLimitArg(process.argv.slice(2))
+  const skuFilter = parseSkuArg(process.argv.slice(2))
 
   const { products: allProducts, errors } = parseProductCSV(baseCsvPath)
   if (errors.length > 0) {
     console.warn(`Loaded ${allProducts.length} products with ${errors.length} parse errors`)
   }
 
-  const products = limit ? allProducts.slice(0, limit) : allProducts
-  console.log(
-    limit
-      ? `Limiting to ${products.length} of ${allProducts.length} products`
-      : `Processing ${products.length} products`,
-  )
+  let products: typeof allProducts
+  if (skuFilter) {
+    products = allProducts.filter((p) => skuFilter.includes(p.sku))
+    console.log(`Filtering to ${products.length} products by SKU: ${skuFilter.join(', ')}`)
+  } else {
+    products = limit ? allProducts.slice(0, limit) : allProducts
+    console.log(
+      limit
+        ? `Limiting to ${products.length} of ${allProducts.length} products`
+        : `Processing ${products.length} products`,
+    )
+  }
 
   const adapter = createNoImgClaudeAdapter()
   const outputPath = resolve(dataDir, 'enriched-noimg-claude.csv')

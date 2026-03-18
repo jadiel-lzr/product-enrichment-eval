@@ -204,8 +204,37 @@ function getEnrichedFieldNames(fields: Record<string, unknown>): readonly string
   })
 }
 
+/**
+ * Normalize raw LLM response fields before Zod validation.
+ * Handles common response quirks:
+ * - additional_info as object → JSON string
+ * - accuracy_score as string → number
+ * - null values → undefined (so Zod .optional() works)
+ */
+function normalizeFields(raw: Record<string, unknown>): Record<string, unknown> {
+  const normalized = { ...raw }
+
+  // Stringify any object/array values in string fields
+  for (const key of Object.keys(normalized)) {
+    const value = normalized[key]
+    if (value === null) {
+      normalized[key] = undefined
+    } else if (typeof value === 'object' && !Array.isArray(value) && value !== null) {
+      normalized[key] = JSON.stringify(value)
+    }
+  }
+
+  // Coerce accuracy_score to integer
+  if (normalized.accuracy_score !== undefined) {
+    const score = Number(normalized.accuracy_score)
+    normalized.accuracy_score = Number.isFinite(score) ? Math.round(score) : undefined
+  }
+
+  return normalized
+}
+
 function buildResult(fields: Record<string, unknown>): EnrichmentResult {
-  const parsed = NoImgEnrichedFieldsSchema.parse(fields)
+  const parsed = NoImgEnrichedFieldsSchema.parse(normalizeFields(fields))
   const enrichedFields = getEnrichedFieldNames(parsed)
   const fillRate = computeFillRate(parsed)
   const status = determineStatus(enrichedFields.length)
@@ -249,10 +278,16 @@ export function createNoImgClaudeAdapter(): EnrichmentAdapter {
         let bestFields: Record<string, unknown> = {}
         let productPageUrl = ''
 
+        console.log(`[noimg-claude] ${product.sku}: search prompt:\n${searchPrompt}\n`)
+
         // --- Pass 1: Search for product page URL + metadata ---
         for (const tier of tiers) {
           const webSearchTool = buildWebSearchTool(tier)
+          console.log(`[noimg-claude] ${product.sku} tier=${tier.name}: domains=${tier.domains ? tier.domains.join(',') : 'unrestricted'}, maxUses=${tier.maxUses}`)
 
+          // No response_format — web_search + JSON schema combined triggers
+          // "Schema is too complex" on Anthropic's API. We ask for JSON in
+          // the prompt instead and parse it ourselves.
           const createParams = {
             model: searchModel,
             max_tokens: MAX_TOKENS,
@@ -263,13 +298,6 @@ export function createNoImgClaudeAdapter(): EnrichmentAdapter {
               },
             ],
             tools: [webSearchTool],
-            response_format: {
-              type: 'json_schema' as const,
-              json_schema: {
-                name: 'search_result',
-                schema: SEARCH_RESULT_SCHEMA,
-              },
-            },
           }
 
           let response: { choices: readonly { message?: { content?: string | null } }[] }
@@ -302,6 +330,8 @@ export function createNoImgClaudeAdapter(): EnrichmentAdapter {
             continue
           }
 
+          console.log(`[noimg-claude] ${product.sku} tier=${tier.name}: raw response:\n${content}\n`)
+
           const parsed = tryParseJsonContent(content)
           if (!parsed) {
             console.log(
@@ -316,7 +346,7 @@ export function createNoImgClaudeAdapter(): EnrichmentAdapter {
 
           // Remove search-only fields before merging into enrichment fields
           const { product_page_url: _url, ...enrichmentFields } = parsed
-          bestFields = mergeResults(bestFields, enrichmentFields)
+          bestFields = mergeResults(bestFields, normalizeFields(enrichmentFields))
 
           if (foundUrl && confidence !== 'none') {
             productPageUrl = foundUrl
@@ -333,23 +363,24 @@ export function createNoImgClaudeAdapter(): EnrichmentAdapter {
         }
 
         // --- Pass 2: Fetch the product page and extract og:image ---
-        if (productPageUrl) {
-          console.log(
-            `[noimg-claude] ${product.sku}: fetching image from ${productPageUrl}`,
-          )
-          const imageUrl = await extractImageFromPage(productPageUrl)
-
-          if (imageUrl) {
-            bestFields.image_links = imageUrl
-            console.log(
-              `[noimg-claude] ${product.sku}: extracted image URL`,
-            )
-          } else {
-            console.log(
-              `[noimg-claude] ${product.sku}: no image extracted from page`,
-            )
-          }
-        }
+        // DISABLED FOR TESTING — enable when Pass 1 results are validated
+        // if (productPageUrl) {
+        //   console.log(
+        //     `[noimg-claude] ${product.sku}: fetching image from ${productPageUrl}`,
+        //   )
+        //   const imageUrl = await extractImageFromPage(productPageUrl)
+        //
+        //   if (imageUrl) {
+        //     bestFields.image_links = imageUrl
+        //     console.log(
+        //       `[noimg-claude] ${product.sku}: extracted image URL`,
+        //     )
+        //   } else {
+        //     console.log(
+        //       `[noimg-claude] ${product.sku}: no image extracted from page`,
+        //     )
+        //   }
+        // }
 
         if (Object.keys(bestFields).length === 0) {
           return {
