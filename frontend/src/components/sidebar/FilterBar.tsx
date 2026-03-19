@@ -30,6 +30,12 @@ function SearchIcon() {
   )
 }
 
+const YES_NO_OPTIONS = ['yes', 'no'] as const
+const YES_NO_LABELS: Record<string, string> = {
+  yes: 'Yes',
+  no: 'No',
+}
+
 function hasActiveFilters(filters: {
   search: string
   brand: string
@@ -37,9 +43,11 @@ function hasActiveFilters(filters: {
   department: string
   enrichedBy: string
   confidence: string
+  sourceUrlFound: string
+  imageLinksFound: string
 }): boolean {
   return Boolean(
-    filters.search || filters.brand || filters.category || filters.department || filters.enrichedBy || filters.confidence,
+    filters.search || filters.brand || filters.category || filters.department || filters.enrichedBy || filters.confidence || filters.sourceUrlFound || filters.imageLinksFound,
   )
 }
 
@@ -131,6 +139,16 @@ export function FilterBar() {
     [setFilters],
   )
 
+  const handleSourceUrlFoundChange = useCallback(
+    (sourceUrlFound: string) => setFilters({ sourceUrlFound }),
+    [setFilters],
+  )
+
+  const handleImageLinksFoundChange = useCallback(
+    (imageLinksFound: string) => setFilters({ imageLinksFound }),
+    [setFilters],
+  )
+
   const handleClearFilters = useCallback(() => {
     setFilters(EMPTY_FILTERS)
   }, [setFilters])
@@ -189,6 +207,24 @@ export function FilterBar() {
             options={[...CONFIDENCE_OPTIONS]}
             displayLabels={CONFIDENCE_LABELS}
             onChange={handleConfidenceChange}
+          />
+        ) : null}
+        {!isWithImages ? (
+          <FilterDropdown
+            label="Source URL"
+            value={filters.sourceUrlFound}
+            options={[...YES_NO_OPTIONS]}
+            displayLabels={YES_NO_LABELS}
+            onChange={handleSourceUrlFoundChange}
+          />
+        ) : null}
+        {!isWithImages ? (
+          <FilterDropdown
+            label="Image Links"
+            value={filters.imageLinksFound}
+            options={[...YES_NO_OPTIONS]}
+            displayLabels={YES_NO_LABELS}
+            onChange={handleImageLinksFoundChange}
           />
         ) : null}
       </div>

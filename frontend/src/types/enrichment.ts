@@ -84,6 +84,8 @@ export interface FilterState {
   readonly department: string
   readonly enrichedBy: string
   readonly confidence: string
+  readonly sourceUrlFound: string
+  readonly imageLinksFound: string
 }
 
 export const EMPTY_FILTERS: FilterState = {
@@ -93,4 +95,6 @@ export const EMPTY_FILTERS: FilterState = {
   department: '',
   enrichedBy: '',
   confidence: '',
+  sourceUrlFound: '',
+  imageLinksFound: '',
 }

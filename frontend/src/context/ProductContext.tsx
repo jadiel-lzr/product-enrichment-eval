@@ -123,6 +123,20 @@ export function ProductProvider({ dataset, children }: ProductProviderProps) {
         return enrichments.some((e) => e.confidenceScore === filters.confidence)
       }
 
+      if (!isWithImages && filters.sourceUrlFound) {
+        const enrichments = enrichmentsByProduct.get(product.sku)
+        const hasSourceUrl = enrichments?.some((e) => e.sourceUrl) ?? false
+        if (filters.sourceUrlFound === 'yes' && !hasSourceUrl) return false
+        if (filters.sourceUrlFound === 'no' && hasSourceUrl) return false
+      }
+
+      if (!isWithImages && filters.imageLinksFound) {
+        const enrichments = enrichmentsByProduct.get(product.sku)
+        const hasImageLinks = enrichments?.some((e) => e.imageLinks && e.imageLinks.length > 0) ?? false
+        if (filters.imageLinksFound === 'yes' && !hasImageLinks) return false
+        if (filters.imageLinksFound === 'no' && hasImageLinks) return false
+      }
+
       return true
     })
   }, [sortedProducts, filters, enrichmentsByProduct, dataset.id])
