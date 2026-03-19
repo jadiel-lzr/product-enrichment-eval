@@ -92,11 +92,14 @@ export function ProductProvider({ dataset, children }: ProductProviderProps) {
     setUrlSku(sku)
   }, [setUrlSku])
 
-  const setFilters = useCallback((newFilters: FilterState) => {
-    setFiltersState(newFilters)
-    const serialized = JSON.stringify(newFilters)
-    lastUrlFiltersRef.current = serialized
-    setUrlFilters(newFilters)
+  const setFilters = useCallback((update: FilterState | Partial<FilterState>) => {
+    setFiltersState((prev) => {
+      const next = { ...prev, ...update }
+      const serialized = JSON.stringify(next)
+      lastUrlFiltersRef.current = serialized
+      setUrlFilters(next)
+      return next
+    })
   }, [setUrlFilters])
 
   const sortedProducts = useMemo(() => sortProducts(products), [products])

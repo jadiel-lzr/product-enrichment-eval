@@ -100,35 +100,35 @@ export function FilterBar() {
         clearTimeout(debounceRef.current)
       }
       debounceRef.current = setTimeout(() => {
-        setFilters({ ...filters, search: search.trimStart() })
+        setFilters({ search: search.trimStart() })
       }, DEBOUNCE_MS)
     },
-    [filters, setFilters],
+    [setFilters],
   )
 
   const handleBrandChange = useCallback(
-    (brand: string) => setFilters({ ...filters, brand }),
-    [filters, setFilters],
+    (brand: string) => setFilters({ brand }),
+    [setFilters],
   )
 
   const handleCategoryChange = useCallback(
-    (category: string) => setFilters({ ...filters, category }),
-    [filters, setFilters],
+    (category: string) => setFilters({ category }),
+    [setFilters],
   )
 
   const handleDepartmentChange = useCallback(
-    (department: string) => setFilters({ ...filters, department }),
-    [filters, setFilters],
+    (department: string) => setFilters({ department }),
+    [setFilters],
   )
 
   const handleEnrichedByChange = useCallback(
-    (enrichedBy: string) => setFilters({ ...filters, enrichedBy }),
-    [filters, setFilters],
+    (enrichedBy: string) => setFilters({ enrichedBy }),
+    [setFilters],
   )
 
   const handleConfidenceChange = useCallback(
-    (confidence: string) => setFilters({ ...filters, confidence }),
-    [filters, setFilters],
+    (confidence: string) => setFilters({ confidence }),
+    [setFilters],
   )
 
   const handleClearFilters = useCallback(() => {
