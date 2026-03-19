@@ -11,6 +11,7 @@ import {
 import { useProductData } from '@/hooks/useProductData'
 import { useUrlParams } from '@/hooks/useUrlParams'
 import {
+  EMPTY_FILTERS,
   TOOL_NAMES,
   type FilterState,
   type Product,
@@ -26,7 +27,7 @@ interface ProductContextValue {
   readonly selectedSku: string | null
   readonly setSelectedSku: (sku: string) => void
   readonly filters: FilterState
-  readonly setFilters: (filters: FilterState) => void
+  readonly setFilters: (update: Partial<FilterState>) => void
   readonly filteredProducts: Product[]
   readonly availableTools: ToolName[]
   readonly brands: string[]
@@ -78,14 +79,12 @@ interface ProductProviderProps {
 
 export function ProductProvider({ dataset, children }: ProductProviderProps) {
   const { products, enrichmentsByProduct, loading, error } = useProductData(dataset)
-  const { urlSku, urlFilters, setUrlSku, setUrlFilters } = useUrlParams()
+  const { urlSku, setUrlSku } = useUrlParams()
   const [selectedSku, setSelectedSkuState] = useState<string | null>(
     () => urlSku,
   )
-  const [filters, setFiltersState] = useState<FilterState>(() => urlFilters)
-  const filtersRef = useRef<FilterState>(urlFilters)
+  const [filters, setFiltersState] = useState<FilterState>(EMPTY_FILTERS)
   const lastUrlSelectionRef = useRef<string | null>(urlSku)
-  const lastUrlFiltersRef = useRef<string>(JSON.stringify(urlFilters))
 
   const setSelectedSku = useCallback((sku: string) => {
     setSelectedSkuState(sku)
@@ -93,13 +92,9 @@ export function ProductProvider({ dataset, children }: ProductProviderProps) {
     setUrlSku(sku)
   }, [setUrlSku])
 
-  const setFilters = useCallback((update: FilterState | Partial<FilterState>) => {
-    const next = { ...filtersRef.current, ...update }
-    filtersRef.current = next
-    setFiltersState(next)
-    lastUrlFiltersRef.current = JSON.stringify(next)
-    setUrlFilters(next)
-  }, [setUrlFilters])
+  const setFilters = useCallback((update: Partial<FilterState>) => {
+    setFiltersState((prev) => ({ ...prev, ...update }))
+  }, [])
 
   const sortedProducts = useMemo(() => sortProducts(products), [products])
 
@@ -157,6 +152,7 @@ export function ProductProvider({ dataset, children }: ProductProviderProps) {
     [products],
   )
 
+  // Sync URL → state for product selection (browser back/forward)
   useEffect(() => {
     if (urlSku === lastUrlSelectionRef.current) {
       return
@@ -166,18 +162,7 @@ export function ProductProvider({ dataset, children }: ProductProviderProps) {
     setSelectedSkuState(urlSku)
   }, [urlSku])
 
-  // Sync URL → state for external navigation (browser back/forward)
-  useEffect(() => {
-    const serializedFilters = JSON.stringify(urlFilters)
-    if (serializedFilters === lastUrlFiltersRef.current) {
-      return
-    }
-
-    lastUrlFiltersRef.current = serializedFilters
-    filtersRef.current = urlFilters
-    setFiltersState(urlFilters)
-  }, [urlFilters])
-
+  // Auto-select first product when filtered list changes
   useEffect(() => {
     if (loading) {
       return
