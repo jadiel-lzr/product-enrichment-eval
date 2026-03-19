@@ -51,7 +51,7 @@ Return ONLY JSON, no markdown, no explanation:
 {"product_page_url": "...", "confidence_score": "high|medium|none", "match_reason": "brief explanation of why this is a match — what code/name/color matched"}`
 }
 
-async function verifyUrl(url: string): Promise<boolean> {
+export async function verifyUrl(url: string): Promise<boolean> {
   try {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 8_000)
@@ -72,6 +72,11 @@ async function verifyUrl(url: string): Promise<boolean> {
 
 const IMAGE_EXTRACT_MODEL = process.env.IMAGE_EXTRACT_MODEL ?? 'anthropic/claude-haiku-4-5-20251001'
 
+function cleanImageUrl(url: string): string {
+  // Strip trailing markdown/JSON artifacts LLMs sometimes append
+  return url.replace(/[`"'\s),\]]+$/, '')
+}
+
 function isValidImageUrl(url: string): boolean {
   if (!url || url.length < 10) return false
   if (url.startsWith('data:')) return false
@@ -80,6 +85,10 @@ function isValidImageUrl(url: string): boolean {
   // Must look like an image file or CDN image URL
   if (!/\.(jpe?g|png|webp|avif|gif|svg)\b/i.test(url) && !/image/i.test(url)) return false
   return true
+}
+
+function deduplicateUrls(urls: string[]): string[] {
+  return [...new Set(urls)]
 }
 
 function extractRelevantHtml(html: string): string {
@@ -125,7 +134,7 @@ async function fetchHtml(url: string): Promise<string | undefined> {
   return response.text()
 }
 
-async function extractViaFirecrawl(url: string): Promise<string | undefined> {
+async function extractViaFirecrawl(url: string, color?: string): Promise<string[] | undefined> {
   const apiKey = process.env.FIRECRAWL_API_KEY
   if (!apiKey) {
     console.log(`[image-extract] ${url}: no FIRECRAWL_API_KEY, skipping fallback`)
@@ -136,20 +145,23 @@ async function extractViaFirecrawl(url: string): Promise<string | undefined> {
   const client = new Firecrawl({ apiKey })
   const doc = await client.scrape(url, { formats: ['markdown', 'images'] })
 
-  // Try images array first — pick first valid product image
+  // Try images array first — collect all valid product images
   if (doc.images && doc.images.length > 0) {
-    const productImage = doc.images.find((img) => isValidImageUrl(img))
-    if (productImage) {
-      const resolved = productImage.startsWith('//') ? `https:${productImage}` : productImage
-      console.log(`[image-extract] ${url}: Firecrawl images array`)
-      return resolved
+    const productImages = deduplicateUrls(
+      doc.images
+        .map((img) => cleanImageUrl(img.startsWith('//') ? `https:${img}` : img))
+        .filter((img) => isValidImageUrl(img)),
+    )
+    if (productImages.length > 0) {
+      console.log(`[image-extract] ${url}: Firecrawl images array (${productImages.length})`)
+      return productImages
     }
   }
 
   // Fall back to LLM on the markdown content
   if (doc.markdown && doc.markdown.trim().length > 0) {
     const trimmed = doc.markdown.length > 12_000 ? doc.markdown.slice(0, 12_000) : doc.markdown
-    return extractImageViaLlm(url, trimmed, 'markdown')
+    return extractImageViaLlm(url, trimmed, 'markdown', color)
   }
 
   console.log(`[image-extract] ${url}: Firecrawl returned no usable content`)
@@ -160,29 +172,36 @@ async function extractImageViaLlm(
   url: string,
   content: string,
   contentType: 'html' | 'markdown',
-): Promise<string | undefined> {
+  color?: string,
+): Promise<string[] | undefined> {
+  const colorInstruction = color
+    ? `\nProduct color: ${color}. ONLY return images that show the "${color}" colorway. If the page has multiple color variants, exclude images for other colors.`
+    : ''
+
   const client = createLiteLLMClient('claude')
   const completion = await client.chat.completions.create({
     model: IMAGE_EXTRACT_MODEL,
-    max_tokens: 256,
+    max_tokens: 1024,
     messages: [
       {
         role: 'user',
-        content: `Extract the primary product image URL from this product page ${contentType}.
+        content: `Extract ALL product image URLs from this product page ${contentType}.
 
-Page URL: ${url}
+Page URL: ${url}${colorInstruction}
 
 Look for (in priority order):
 1. og:image meta tag
-2. JSON-LD structured data image field
-3. Main product image (largest/first product photo, not icons or logos)
+2. JSON-LD structured data image fields (may contain arrays)
+3. Product gallery images (all product photos, not icons or logos)
 
 Rules:
-- Return ONLY a valid absolute image URL, nothing else
+- Return a JSON object: {"images": ["url1", "url2", ...]}
+- Include all product photos (front, back, side, detail views)
+- URLs must be valid absolute URLs
 - If the URL starts with "//" prefix it with "https:"
 - If the URL is a relative path, combine it with the page domain
-- If the image is a site logo or placeholder (not a product photo), return "none"
-- If no product image is found, return "none"
+- Exclude site logos, favicons, icons, placeholders, and social sharing images
+- If no product images are found, return {"images": []}
 
 ${contentType === 'html' ? 'HTML' : 'Markdown'}:
 ${content}`,
@@ -192,22 +211,42 @@ ${content}`,
 
   const raw = completion.choices[0]?.message?.content?.trim() ?? ''
 
-  // Extract first URL from the response in case LLM was verbose
-  const urlMatch = raw.match(/https?:\/\/[^\s"'<>]+/i)
-    ?? raw.match(/^\/\/[^\s"'<>]+/i)
-  const result = urlMatch?.[0]
+  // Try to parse as JSON first
+  try {
+    const parsed = JSON.parse(raw)
+    const images = deduplicateUrls(
+      (Array.isArray(parsed.images) ? parsed.images : Array.isArray(parsed) ? parsed : [])
+        .filter((u: unknown): u is string => typeof u === 'string')
+        .map((u: string) => cleanImageUrl(u.startsWith('//') ? `https:${u}` : u))
+        .filter((u: string) => isValidImageUrl(u)),
+    )
 
-  if (!result || !isValidImageUrl(result)) {
-    console.log(`[image-extract] ${url}: LLM found no image`)
-    return undefined
+    if (images.length > 0) {
+      console.log(`[image-extract] ${url}: LLM extracted ${images.length} images`)
+      return images
+    }
+  } catch {
+    // LLM may have returned plain URLs instead of JSON
   }
 
-  const imageUrl = result.startsWith('//') ? `https:${result}` : result
-  console.log(`[image-extract] ${url}: LLM extracted image`)
-  return imageUrl
+  // Fallback: extract all URLs from the response
+  const urlMatches = raw.matchAll(/https?:\/\/[^\s"'<>,\])+]+/gi)
+  const images = deduplicateUrls(
+    [...urlMatches]
+      .map((m) => cleanImageUrl(m[0]))
+      .filter((u) => isValidImageUrl(u)),
+  )
+
+  if (images.length > 0) {
+    console.log(`[image-extract] ${url}: LLM extracted ${images.length} images (from text)`)
+    return images
+  }
+
+  console.log(`[image-extract] ${url}: LLM found no images`)
+  return undefined
 }
 
-export async function extractImageFromPage(url: string): Promise<string | undefined> {
+export async function extractImageFromPage(url: string, color?: string): Promise<string[] | undefined> {
   if (!url || url.trim() === '') return undefined
 
   try {
@@ -217,19 +256,19 @@ export async function extractImageFromPage(url: string): Promise<string | undefi
     if (html) {
       const relevantHtml = extractRelevantHtml(html)
       if (relevantHtml.trim().length > 0) {
-        const result = await extractImageViaLlm(url, relevantHtml, 'html')
+        const result = await extractImageViaLlm(url, relevantHtml, 'html', color)
         if (result) return result
       }
     }
 
     // Fall back to Firecrawl for 403/429/empty pages
-    return await extractViaFirecrawl(url)
+    return await extractViaFirecrawl(url, color)
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error)
     console.log(`[image-extract] ${url}: direct fetch failed (${msg}), trying Firecrawl`)
 
     try {
-      return await extractViaFirecrawl(url)
+      return await extractViaFirecrawl(url, color)
     } catch (fcError) {
       const fcMsg = fcError instanceof Error ? fcError.message : String(fcError)
       console.log(`[image-extract] ${url}: Firecrawl also failed (${fcMsg})`)
