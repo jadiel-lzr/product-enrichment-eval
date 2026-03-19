@@ -102,7 +102,9 @@ Ran Pass 1 (URL finding only) on 3 batches of 20 random products each.
 
 ### A/B Test: Site Hints vs No Site Hints
 
-Tested whether the `site:brand.com` hints in the search prompt actually improve results. Ran the same 13 previously-matched products with hints disabled.
+Tested whether the `site:brand.com` hints in the search prompt actually improve results. Two rounds:
+
+#### Round 1 — 13 products (initial pilot)
 
 | Result | Count |
 |--------|-------|
@@ -112,7 +114,45 @@ Tested whether the `site:brand.com` hints in the search prompt actually improve 
 
 The 2 lost products were Mini Rodini (found via niche retailer stadtlandkind.ch with hints) and Khaite (FWRD link was flaky). Major brands (McQueen, Balmain, Burberry, Courrèges) were found identically without hints.
 
-**Conclusion:** Site hints provide marginal value — they help for smaller brands on niche retailers but major brands are found regardless. The current ~50 brand map is sufficient. Not worth scaling to 5000+ brands. If a brand isn't in the map, the unrestricted search still runs fine without the hint.
+#### Round 2 — 111 products (full coverage, 2026-03-19)
+
+Re-ran all 111 products that had a `source_url` from the enriched CSV. Same search prompt, site hints stripped.
+
+| Result | Count | % |
+|--------|-------|---|
+| Identical (same URL + confidence) | 57 | 51% |
+| Lost (found with hints, not without) | 24 | 22% |
+| Different source (valid alternative URL) | 23 | 21% |
+| Same URL, different confidence | 7 | 6% |
+
+**Most affected brands without hints:**
+
+| Brand | Lost | Notes |
+|-------|------|-------|
+| Burberry | 8 | Hints direct to `us.burberry.com` with unique product IDs (e.g. `p81139371`) |
+| CB Made in Italy | 4 | Niche brand, hints pointed to `cbmadeinitaly.com` |
+| Save the Duck | 3 | Found right URL but different regional domain returned non-200 |
+| Alexander McQueen | 2 | Official site URLs not discovered without hints |
+| Balmain | 1 | `int.balmain.com` not found, but `us.balmain.com` was |
+| Zanone / Glanshirt | 2 | Slowear sub-brands, hints pointed to `slowear.com` |
+| Mini Rodini | 1 | Niche kids retailer (stadtlandkind.ch) not found |
+| Montblanc | 1 | Eyewear retailer link flaky |
+| Boss Hugo Boss | 1 | Niche eyewear retailer not found |
+| Bon Ton Toys | 1 | Regional domain (us.bontontoys.com) not found |
+| Blancha | 1 | Mytheresa link returned non-200 in both cases |
+
+**"Different source" is mostly fine:** 23 products found the same product on a different retailer. Common swaps: `us.balmain.com` ↔ `ca.balmain.com`, `cbmadeinitaly.com` ↔ `italist.com`, `alexandermcqueen.com` ↔ third-party boutiques.
+
+**Confidence shifts both ways:** 4 dropped from high→medium without hints, 3 went medium→high (Mini Rodini and Bon Ton Toys found better matches on general retailers).
+
+**New retailers discovered** (added to `RETAILER_DOMAINS` in search-config.ts): gebnegozionline.com, junioredition.com, fourkids.com, lyst.com, fashionclinic.com, stadtlandkind.ch, mochikids.com, cettire.com, flannels.com, antonioli.eu, endclothing.com, montiboutique.com, gaudenziboutique.com.
+
+**Conclusion:** At scale, site hints improve match rate by ~22% and are critical for:
+1. Brands with complex URL structures (Burberry, Balmain) where product IDs aren't easily searchable
+2. Niche/small brands that don't rank high in general search (CB Made in Italy, Blancha)
+3. Products where the official site has unique product codes in URLs
+
+The current ~50 brand map should be maintained and expanded. For brands not in the map, unrestricted search still works — but the 22% loss rate justifies the effort of maintaining domain mappings.
 
 ## What Needs to Be Done
 
