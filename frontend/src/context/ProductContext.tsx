@@ -102,13 +102,15 @@ export function ProductProvider({ dataset, children }: ProductProviderProps) {
   const sortedProducts = useMemo(() => sortProducts(products), [products])
 
   const filteredProducts = useMemo(() => {
+    const isWithImages = dataset.id === 'with-images'
+
     return sortedProducts.filter((product) => {
       if (!matchesSearch(product, filters.search)) return false
       if (!matchesFilter(product.brand, filters.brand)) return false
       if (!matchesFilter(product.category, filters.category)) return false
       if (!matchesFilter(product.department, filters.department)) return false
 
-      if (filters.enrichedBy) {
+      if (isWithImages && filters.enrichedBy) {
         const enrichments = enrichmentsByProduct.get(product.sku)
         if (!enrichments) return false
         if (filters.enrichedBy === 'all') {
@@ -118,7 +120,7 @@ export function ProductProvider({ dataset, children }: ProductProviderProps) {
         return enrichments.some((e) => e.tool === filters.enrichedBy)
       }
 
-      if (filters.confidence) {
+      if (!isWithImages && filters.confidence) {
         const enrichments = enrichmentsByProduct.get(product.sku)
         if (!enrichments) return false
         return enrichments.some((e) => e.confidenceScore === filters.confidence)
@@ -126,7 +128,7 @@ export function ProductProvider({ dataset, children }: ProductProviderProps) {
 
       return true
     })
-  }, [sortedProducts, filters, enrichmentsByProduct])
+  }, [sortedProducts, filters, enrichmentsByProduct, dataset.id])
 
   const availableTools = useMemo<ToolName[]>(() => {
     const toolsWithData = new Set<ToolName>()

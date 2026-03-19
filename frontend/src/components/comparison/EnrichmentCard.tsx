@@ -123,26 +123,8 @@ export function EnrichmentCard({ enrichment, product, genericTitle }: Enrichment
         </div>
       ) : null}
 
-      <div className="space-y-2.5">
-        {CORE_ENRICHMENT_FIELDS.map((fieldName) => {
-          const enrichedValue = enrichment.enrichedValues[fieldName]
-          const originalValue = getProductValue(product, fieldName)
-
-          return (
-            <FieldRow
-              key={fieldName}
-              fieldName={fieldName}
-              label={FIELD_LABELS[fieldName]}
-              enrichedValue={enrichedValue}
-              originalValue={originalValue}
-              status={getFieldStatus(fieldName, enrichedValue, originalValue)}
-            />
-          )
-        })}
-      </div>
-
       {enrichment.imageLinks && enrichment.imageLinks.length > 0 ? (
-        <div className="mt-4 space-y-3 border-t border-gray-100 pt-4">
+        <div className="mb-4 space-y-3">
           <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
             Found Images ({enrichment.imageLinks.length})
           </span>
@@ -195,6 +177,24 @@ export function EnrichmentCard({ enrichment, product, genericTitle }: Enrichment
           </div>
         </div>
       ) : null}
+
+      <div className="space-y-2.5">
+        {CORE_ENRICHMENT_FIELDS.map((fieldName) => {
+          const enrichedValue = enrichment.enrichedValues[fieldName]
+          const originalValue = getProductValue(product, fieldName)
+
+          return (
+            <FieldRow
+              key={fieldName}
+              fieldName={fieldName}
+              label={FIELD_LABELS[fieldName]}
+              enrichedValue={enrichedValue}
+              originalValue={originalValue}
+              status={getFieldStatus(fieldName, enrichedValue, originalValue)}
+            />
+          )
+        })}
+      </div>
 
       {additionalFields.length > 0 ? (
         <div className="mt-4 border-t border-gray-100 pt-4">
