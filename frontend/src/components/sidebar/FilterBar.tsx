@@ -1,13 +1,7 @@
-import { useEffect, useRef, useCallback, useState } from 'react'
+import { useEffect, useRef, useCallback, useState, useMemo } from 'react'
 import { useProducts } from '@/context/ProductContext'
 import { EMPTY_FILTERS, TOOL_DISPLAY_NAMES } from '@/types/enrichment'
 import { FilterDropdown } from './FilterDropdown'
-
-const ENRICHED_BY_OPTIONS = ['all', 'claude', 'firecrawl', 'gemini', 'gpt'] as const
-const ENRICHED_BY_LABELS: Record<string, string> = {
-  all: 'All Tools',
-  ...TOOL_DISPLAY_NAMES,
-}
 
 const DEBOUNCE_MS = 200
 
@@ -50,7 +44,17 @@ export function FilterBar() {
     brands,
     categories,
     departments,
+    availableTools,
   } = useProducts()
+
+  const enrichedByOptions = useMemo(() => {
+    if (availableTools.length <= 1) return []
+    return ['all', ...availableTools]
+  }, [availableTools])
+
+  const enrichedByLabels = useMemo<Record<string, string>>(() => {
+    return { all: 'All Tools', ...TOOL_DISPLAY_NAMES }
+  }, [])
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [searchValue, setSearchValue] = useState(filters.search)
@@ -143,13 +147,15 @@ export function FilterBar() {
           options={departments}
           onChange={handleDepartmentChange}
         />
-        <FilterDropdown
-          label="Enriched By"
-          value={filters.enrichedBy}
-          options={[...ENRICHED_BY_OPTIONS]}
-          displayLabels={ENRICHED_BY_LABELS}
-          onChange={handleEnrichedByChange}
-        />
+        {enrichedByOptions.length > 0 ? (
+          <FilterDropdown
+            label="Enriched By"
+            value={filters.enrichedBy}
+            options={enrichedByOptions}
+            displayLabels={enrichedByLabels}
+            onChange={handleEnrichedByChange}
+          />
+        ) : null}
       </div>
 
       {/* Match count and clear */}

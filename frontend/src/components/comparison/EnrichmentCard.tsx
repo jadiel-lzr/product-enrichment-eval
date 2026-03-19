@@ -14,6 +14,7 @@ import { StatusBadge } from './StatusBadge'
 interface EnrichmentCardProps {
   readonly enrichment: ToolEnrichment
   readonly product: Product
+  readonly genericTitle?: boolean
 }
 
 function getProductValue(product: Product, field: string): string | undefined {
@@ -30,7 +31,7 @@ function getProductValue(product: Product, field: string): string | undefined {
   return String(rawValue)
 }
 
-export function EnrichmentCard({ enrichment, product }: EnrichmentCardProps) {
+export function EnrichmentCard({ enrichment, product, genericTitle }: EnrichmentCardProps) {
   const [showAdditionalFields, setShowAdditionalFields] = useState(false)
 
   const additionalFields = useMemo(
@@ -41,17 +42,20 @@ export function EnrichmentCard({ enrichment, product }: EnrichmentCardProps) {
     [enrichment.enrichedValues],
   )
 
+  const hasUrlDiscovery = Boolean(enrichment.confidenceScore || enrichment.matchReason)
+  const showFailedState = enrichment.status === 'failed' && !hasUrlDiscovery
+
   return (
     <article
       className={`min-h-[28rem] rounded-2xl border border-gray-200 bg-white p-4 shadow-sm ${
-        enrichment.status === 'failed' ? 'opacity-60' : ''
+        showFailedState ? 'opacity-60' : ''
       }`}
     >
       <header className="mb-4 flex items-start justify-between gap-3">
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <h2 className="text-lg font-semibold text-gray-900">
-              {TOOL_DISPLAY_NAMES[enrichment.tool]}
+              {genericTitle ? 'Enriched Data' : TOOL_DISPLAY_NAMES[enrichment.tool]}
             </h2>
             <StatusBadge status={enrichment.status} />
           </div>
@@ -62,32 +66,17 @@ export function EnrichmentCard({ enrichment, product }: EnrichmentCardProps) {
         <AccuracyScore score={enrichment.accuracyScore} />
       </header>
 
-      {enrichment.status === 'failed' ? (
+      {showFailedState ? (
         <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           {enrichment.error || 'This tool failed to produce enrichment output.'}
         </div>
       ) : null}
 
-      <div className="space-y-2.5">
-        {CORE_ENRICHMENT_FIELDS.map((fieldName) => {
-          const enrichedValue = enrichment.enrichedValues[fieldName]
-          const originalValue = getProductValue(product, fieldName)
-
-          return (
-            <FieldRow
-              key={fieldName}
-              fieldName={fieldName}
-              label={FIELD_LABELS[fieldName]}
-              enrichedValue={enrichedValue}
-              originalValue={originalValue}
-              status={getFieldStatus(fieldName, enrichedValue, originalValue)}
-            />
-          )
-        })}
-      </div>
-
       {enrichment.confidenceScore || enrichment.matchReason || enrichment.sourceUrl ? (
-        <div className="mt-4 space-y-2 border-t border-gray-100 pt-4">
+        <div className="mb-4 space-y-2 rounded-xl border border-blue-100 bg-blue-50/50 px-3 py-3">
+          <span className="text-xs font-semibold uppercase tracking-wider text-blue-600">
+            URL Discovery
+          </span>
           {enrichment.confidenceScore ? (
             <div className="flex items-start gap-3">
               <span className="w-28 shrink-0 text-xs font-medium text-gray-500">
@@ -133,6 +122,24 @@ export function EnrichmentCard({ enrichment, product }: EnrichmentCardProps) {
           ) : null}
         </div>
       ) : null}
+
+      <div className="space-y-2.5">
+        {CORE_ENRICHMENT_FIELDS.map((fieldName) => {
+          const enrichedValue = enrichment.enrichedValues[fieldName]
+          const originalValue = getProductValue(product, fieldName)
+
+          return (
+            <FieldRow
+              key={fieldName}
+              fieldName={fieldName}
+              label={FIELD_LABELS[fieldName]}
+              enrichedValue={enrichedValue}
+              originalValue={originalValue}
+              status={getFieldStatus(fieldName, enrichedValue, originalValue)}
+            />
+          )
+        })}
+      </div>
 
       {enrichment.imageLinks && enrichment.imageLinks.length > 0 ? (
         <div className="mt-4 space-y-3 border-t border-gray-100 pt-4">

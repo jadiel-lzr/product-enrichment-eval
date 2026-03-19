@@ -110,6 +110,7 @@ export function ComparisonView() {
                   key={enrichment.tool}
                   enrichment={enrichment}
                   product={selectedProduct}
+                  genericTitle
                 />
               ))
             : TOOL_NAMES.map((tool) => {
