@@ -149,7 +149,7 @@ export function EnrichmentCard({ enrichment, product, genericTitle }: Enrichment
           <div
             className={
               enrichment.imageLinks.length === 1
-                ? 'flex justify-center'
+                ? 'flex'
                 : 'grid grid-cols-2 gap-3'
             }
           >
