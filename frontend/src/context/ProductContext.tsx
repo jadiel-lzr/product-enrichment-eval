@@ -17,9 +17,10 @@ import {
   type ToolEnrichment,
   type ToolName,
 } from '@/types/enrichment'
-import type { DatasetConfig } from '@/types/dataset'
+import type { DatasetConfig, DatasetId } from '@/types/dataset'
 
 interface ProductContextValue {
+  readonly datasetId: DatasetId
   readonly products: Product[]
   readonly enrichmentsByProduct: Map<string, ToolEnrichment[]>
   readonly selectedSku: string | null
@@ -200,6 +201,7 @@ export function ProductProvider({ dataset, children }: ProductProviderProps) {
 
   const value = useMemo<ProductContextValue>(
     () => ({
+      datasetId: dataset.id,
       products,
       enrichmentsByProduct,
       selectedSku,
@@ -215,6 +217,7 @@ export function ProductProvider({ dataset, children }: ProductProviderProps) {
       error,
     }),
     [
+      dataset.id,
       products,
       enrichmentsByProduct,
       selectedSku,

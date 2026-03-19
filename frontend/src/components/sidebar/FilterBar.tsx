@@ -54,9 +54,10 @@ export function FilterBar() {
     departments,
     availableTools,
     enrichmentsByProduct,
+    datasetId,
   } = useProducts()
 
-  const isMultiTool = availableTools.length > 1
+  const isWithImages = datasetId === 'with-images'
 
   const hasConfidenceData = useMemo(() => {
     for (const enrichments of enrichmentsByProduct.values()) {
@@ -68,9 +69,9 @@ export function FilterBar() {
   }, [enrichmentsByProduct])
 
   const enrichedByOptions = useMemo(() => {
-    if (!isMultiTool) return []
+    if (!isWithImages) return []
     return ['all', ...availableTools]
-  }, [isMultiTool, availableTools])
+  }, [isWithImages, availableTools])
 
   const enrichedByLabels = useMemo<Record<string, string>>(() => {
     return { all: 'All Tools', ...TOOL_DISPLAY_NAMES }
