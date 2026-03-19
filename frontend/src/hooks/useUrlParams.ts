@@ -29,6 +29,7 @@ export function useUrlParams(): UrlParamState {
       category: getFilterValue(searchParams, 'category'),
       department: getFilterValue(searchParams, 'department'),
       enrichedBy: getFilterValue(searchParams, 'enrichedBy'),
+      confidence: getFilterValue(searchParams, 'confidence'),
     }),
     [searchParamsString],
   )

@@ -83,6 +83,7 @@ export interface FilterState {
   readonly category: string
   readonly department: string
   readonly enrichedBy: string
+  readonly confidence: string
 }
 
 export const EMPTY_FILTERS: FilterState = {
@@ -91,4 +92,5 @@ export const EMPTY_FILTERS: FilterState = {
   category: '',
   department: '',
   enrichedBy: '',
+  confidence: '',
 }

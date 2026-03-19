@@ -5,6 +5,13 @@ import { FilterDropdown } from './FilterDropdown'
 
 const DEBOUNCE_MS = 200
 
+const CONFIDENCE_OPTIONS = ['high', 'medium', 'low'] as const
+const CONFIDENCE_LABELS: Record<string, string> = {
+  high: 'High',
+  medium: 'Medium',
+  low: 'Low',
+}
+
 function SearchIcon() {
   return (
     <svg
@@ -29,9 +36,10 @@ function hasActiveFilters(filters: {
   category: string
   department: string
   enrichedBy: string
+  confidence: string
 }): boolean {
   return Boolean(
-    filters.search || filters.brand || filters.category || filters.department || filters.enrichedBy,
+    filters.search || filters.brand || filters.category || filters.department || filters.enrichedBy || filters.confidence,
   )
 }
 
@@ -45,12 +53,24 @@ export function FilterBar() {
     categories,
     departments,
     availableTools,
+    enrichmentsByProduct,
   } = useProducts()
 
+  const isMultiTool = availableTools.length > 1
+
+  const hasConfidenceData = useMemo(() => {
+    for (const enrichments of enrichmentsByProduct.values()) {
+      for (const e of enrichments) {
+        if (e.confidenceScore) return true
+      }
+    }
+    return false
+  }, [enrichmentsByProduct])
+
   const enrichedByOptions = useMemo(() => {
-    if (availableTools.length <= 1) return []
+    if (!isMultiTool) return []
     return ['all', ...availableTools]
-  }, [availableTools])
+  }, [isMultiTool, availableTools])
 
   const enrichedByLabels = useMemo<Record<string, string>>(() => {
     return { all: 'All Tools', ...TOOL_DISPLAY_NAMES }
@@ -105,6 +125,11 @@ export function FilterBar() {
     [filters, setFilters],
   )
 
+  const handleConfidenceChange = useCallback(
+    (confidence: string) => setFilters({ ...filters, confidence }),
+    [filters, setFilters],
+  )
+
   const handleClearFilters = useCallback(() => {
     setFilters(EMPTY_FILTERS)
   }, [setFilters])
@@ -154,6 +179,15 @@ export function FilterBar() {
             options={enrichedByOptions}
             displayLabels={enrichedByLabels}
             onChange={handleEnrichedByChange}
+          />
+        ) : null}
+        {hasConfidenceData ? (
+          <FilterDropdown
+            label="Confidence"
+            value={filters.confidence}
+            options={[...CONFIDENCE_OPTIONS]}
+            displayLabels={CONFIDENCE_LABELS}
+            onChange={handleConfidenceChange}
           />
         ) : null}
       </div>

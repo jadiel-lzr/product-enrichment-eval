@@ -117,6 +117,12 @@ export function ProductProvider({ dataset, children }: ProductProviderProps) {
         return enrichments.some((e) => e.tool === filters.enrichedBy)
       }
 
+      if (filters.confidence) {
+        const enrichments = enrichmentsByProduct.get(product.sku)
+        if (!enrichments) return false
+        return enrichments.some((e) => e.confidenceScore === filters.confidence)
+      }
+
       return true
     })
   }, [sortedProducts, filters, enrichmentsByProduct])
