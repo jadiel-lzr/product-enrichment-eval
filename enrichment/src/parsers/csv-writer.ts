@@ -20,7 +20,14 @@ export function writeProductCSV(
     return row
   })
 
-  const csvString = Papa.unparse(serialized)
+  const allKeys = new Set<string>()
+  for (const row of serialized) {
+    for (const key of Object.keys(row)) {
+      allKeys.add(key)
+    }
+  }
+
+  const csvString = Papa.unparse(serialized, { columns: [...allKeys] })
 
   mkdirSync(dirname(filePath), { recursive: true })
   writeFileSync(filePath, csvString, 'utf-8')
