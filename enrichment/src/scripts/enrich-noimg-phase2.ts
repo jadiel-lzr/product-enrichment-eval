@@ -3,7 +3,8 @@ import { dirname, resolve } from 'node:path'
 import { loadEnvFile } from 'node:process'
 import { fileURLToPath } from 'node:url'
 import pLimit from 'p-limit'
-import { extractImageFromPage } from '../adapters/noimg-claude-adapter.js'
+import { extractImageFromPage, verifyUrl } from '../adapters/noimg-claude-adapter.js'
+import { translateColor } from '../images/search-config.js'
 import { parseProductCSV } from '../parsers/csv-reader.js'
 import { writeProductCSV } from '../parsers/csv-writer.js'
 
@@ -39,7 +40,7 @@ interface Phase1Checkpoint {
 }
 
 interface Phase2Progress {
-  readonly completed: Record<string, string | undefined>
+  readonly completed: Record<string, string[] | undefined>
 }
 
 function parseSkuArg(args: readonly string[]): string[] | undefined {
@@ -80,6 +81,12 @@ function loadPhase2Progress(): Phase2Progress {
 
 function savePhase2Progress(progress: Phase2Progress): void {
   writeFileSync(phase2CheckpointPath, JSON.stringify(progress, null, 2), 'utf-8')
+}
+
+function getProductColor(row: Record<string, unknown>): string {
+  const colorOriginal = typeof row.color_original === 'string' ? row.color_original : ''
+  const color = typeof row.color === 'string' ? row.color : ''
+  return translateColor(colorOriginal || color)
 }
 
 async function main(): Promise<void> {
@@ -128,10 +135,10 @@ async function main(): Promise<void> {
   const remaining = targetSkus.filter((sku) => !alreadyDone.has(sku))
 
   // Apply already-completed results to rows
-  for (const [sku, imageUrl] of Object.entries(progress.completed)) {
+  for (const [sku, imageUrls] of Object.entries(progress.completed)) {
     const row = rows[sku]
-    if (row && imageUrl) {
-      row.image_links = imageUrl
+    if (row && imageUrls && imageUrls.length > 0) {
+      row.image_links = imageUrls.join('|')
     }
   }
 
@@ -140,7 +147,7 @@ async function main(): Promise<void> {
 
   const concurrencyLimit = pLimit(CONCURRENCY)
   let processedCount = alreadyDone.size
-  let imagesFound = Object.values(progress.completed).filter(Boolean).length
+  let imagesFound = Object.values(progress.completed).filter((v) => v && v.length > 0).length
 
   const updatedProgress: Phase2Progress = { completed: { ...progress.completed } }
 
@@ -149,22 +156,34 @@ async function main(): Promise<void> {
       concurrencyLimit(async () => {
         const row = rows[sku]
         const sourceUrl = row?.source_url as string
+        const color = getProductColor(row)
 
-        const imageUrl = await extractImageFromPage(sourceUrl)
+        const rawImageUrls = await extractImageFromPage(sourceUrl, color || undefined)
 
-        if (imageUrl) {
-          row.image_links = imageUrl
+        // Verify each image URL is accessible
+        const imageUrls = rawImageUrls
+          ? (await Promise.all(
+              rawImageUrls.map(async (imgUrl) => {
+                const ok = await verifyUrl(imgUrl)
+                if (!ok) console.log(`[phase2] ${sku}: dropping dead image URL: ${imgUrl}`)
+                return ok ? imgUrl : null
+              }),
+            )).filter((u): u is string => u !== null)
+          : []
+
+        if (imageUrls.length > 0) {
+          row.image_links = imageUrls.join('|')
           imagesFound++
         }
 
-        const newCompleted = { ...updatedProgress.completed, [sku]: imageUrl }
-        const newProgress: Phase2Progress = { completed: newCompleted }
-        Object.assign(updatedProgress.completed, newCompleted)
-        savePhase2Progress(newProgress)
+        const verifiedUrls = imageUrls.length > 0 ? imageUrls : undefined
+        const newCompleted = { ...updatedProgress.completed, [sku]: verifiedUrls }
+        Object.assign(updatedProgress.completed, { [sku]: verifiedUrls })
+        savePhase2Progress({ completed: newCompleted })
 
         processedCount++
-        const status = imageUrl ? 'image found' : 'no image'
-        console.log(`[phase2] ${processedCount}/${targetSkus.length} ${sku} → ${status}`)
+        const status = imageUrls ? `${imageUrls.length} images` : 'no image'
+        console.log(`[phase2] ${processedCount}/${targetSkus.length} ${sku} → ${status}${color ? ` (color: ${color})` : ''}`)
       }),
     ),
   )
@@ -177,7 +196,11 @@ async function main(): Promise<void> {
   writeProductCSV(orderedRows, outputPath)
   copyFileSync(outputPath, frontendOutputPath)
 
-  console.log(`\n[phase2] Complete: ${imagesFound} images found out of ${targetSkus.length} products with URLs`)
+  const totalImages = Object.values(updatedProgress.completed)
+    .filter((v) => v && v.length > 0)
+    .reduce((sum, v) => sum + (v?.length ?? 0), 0)
+
+  console.log(`\n[phase2] Complete: ${imagesFound} products with images (${totalImages} total URLs) out of ${targetSkus.length} products with URLs`)
   console.log(`Output: ${outputPath}`)
   console.log(`Frontend copy: ${frontendOutputPath}`)
 }
