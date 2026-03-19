@@ -8,7 +8,7 @@ import {
   tryParseJsonContent,
 } from './litellm.js'
 import type { Product } from '../types/product.js'
-import { translateColor, correctBrand, BRAND_DOMAINS, FEED_SUPPLIER_DOMAINS } from '../images/search-config.js'
+import { translateColor, correctBrand, BRAND_DOMAINS, FEED_SUPPLIER_DOMAINS, RETAILER_DOMAINS } from '../images/search-config.js'
 
 const DEFAULT_SEARCH_MODEL = 'anthropic/claude-sonnet-4-6'
 const MAX_TOKENS = 4096
@@ -29,42 +29,67 @@ function buildSearchPrompt(product: Product): string {
   const brandDomain = BRAND_DOMAINS[product.brand.toUpperCase().trim()]
   if (brandDomain) siteHints.push(brandDomain)
   const siteNote = siteHints.length > 0
-    ? `\nAlso try: ${siteHints.map((d) => `site:${d}`).join(' or ')}`
+    ? `\nPriority sites: ${siteHints.map((d) => `site:${d}`).join(' or ')}`
     : ''
+
+  // Pick a subset of major retailers to suggest (keep prompt concise)
+  const topRetailers = RETAILER_DOMAINS.slice(0, 10)
+  const retailerNote = `\nAlso try major retailers: ${topRetailers.map((d) => `site:${d}`).join(' or ')}`
 
   return `Find the specific product page URL for this fashion product.
 
 Product: ${brand} "${name}" | Code: ${code} | Color: ${colorEng || product.color} | Category: ${product.category}
 
-Search: ${searchHint}${siteNote}
+Search: ${searchHint}${siteNote}${retailerNote}
 
 RULES:
-- Only return a URL for a specific product page (NOT a collection, category, or brand page)
+- Only return URLs for specific product pages (NOT collections, categories, or brand pages)
 - The page must have product images and details — an out-of-stock page with no images is NOT a match
 - "high" = exact product code "${code}" in URL or page + exact color match + has product images
 - "medium" = brand and product name match + close color (e.g. "dark brown" vs "brown") + has product images
 - "none" = no match, wrong color entirely, or page has no product images/info
-- If you find the right product but in a DIFFERENT COLOR (e.g. looking for black, found red), return "none"
+- If you find the right product but in a DIFFERENT COLOR (e.g. looking for black, found red), do NOT include it
 - Do NOT guess or fabricate URLs — only return URLs from actual search results
+- Return up to 3 candidate URLs ranked by confidence (best first)
 
 Return ONLY JSON, no markdown, no explanation:
-{"product_page_url": "...", "confidence_score": "high|medium|none", "match_reason": "brief explanation of why this is a match — what code/name/color matched"}`
+{"candidates": [{"product_page_url": "...", "confidence_score": "high|medium", "match_reason": "brief explanation"}, ...]}`
 }
 
 export async function verifyUrl(url: string): Promise<boolean> {
+  const headers = {
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  }
+
   try {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 8_000)
-    const response = await fetch(url, {
-      method: 'HEAD',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      },
-      signal: controller.signal,
+    const ctrl = new AbortController()
+    const timeout = setTimeout(() => ctrl.abort(), 10_000)
+    const res = await fetch(url, {
+      method: 'GET',
+      headers,
+      signal: ctrl.signal,
       redirect: 'follow',
     })
     clearTimeout(timeout)
-    return response.ok
+
+    // Cancel body immediately — we only need status + final URL
+    if (res.body) await res.body.cancel()
+
+    if (!res.ok) return false
+
+    // Detect soft redirects: product page removed → redirected to category/homepage
+    const finalUrl = res.url
+    if (finalUrl && finalUrl !== url) {
+      const originalPath = new URL(url).pathname
+      const finalPath = new URL(finalUrl).pathname
+      // If the path changed significantly (not just trailing slash or locale), it's a redirect away
+      if (finalPath !== originalPath && !finalPath.startsWith(originalPath)) {
+        console.log(`[verifyUrl] ${url}: redirected to ${finalUrl} — treating as dead`)
+        return false
+      }
+    }
+
+    return true
   } catch {
     return false
   }
@@ -82,13 +107,94 @@ function isValidImageUrl(url: string): boolean {
   if (url.startsWith('data:')) return false
   if (!/^(https?:)?\/\//i.test(url)) return false
   if (/(logo|favicon|sprite|social_sharing|spinner|spin_|widget|icon)/i.test(url)) return false
+  // Exclude common non-product patterns (banners, navigation, footer, editorial, store UI)
+  if (/(banner|nav[_-]|footer|editorial|blog|magazine|lookbook|placeholder|badge|payment|flag[_-]|shipping|return|need_help|express_|easy_|star_|guarantee|trust|secure_|checkout)/i.test(url)) return false
+  // Exclude tiny Shopify thumbnails (width=200 or less) — likely navigation/icons
+  if (/[?&]width=(1?\d{1,2}|200)\b/.test(url)) return false
+  // Reject truncated CDN URLs (Cloudinary) that end with transform params but no actual image file
+  if (/\/image\/upload\/(?:[^/]+\/)*[^/.]+$/.test(url)) return false
   // Must look like an image file or CDN image URL
   if (!/\.(jpe?g|png|webp|avif|gif|svg)\b/i.test(url) && !/image/i.test(url)) return false
   return true
 }
 
+/** Max images to keep per product — beyond this is almost certainly site-wide noise */
+const MAX_IMAGES_PER_PRODUCT = 10
+
 function deduplicateUrls(urls: string[]): string[] {
   return [...new Set(urls)]
+}
+
+/**
+ * Pick the best size variant for each unique image, deduplicating
+ * same-image-different-size URLs (e.g. montiboutique micro/mini/medium/big/large/original).
+ * Prefers "original" > "large" > "big" > "medium" > others.
+ */
+function deduplicateSizeVariants(urls: string[]): string[] {
+  const SIZE_PRIORITY: Record<string, number> = { original: 5, large: 4, big: 3, medium: 2, small: 1, mini: 0, micro: 0 }
+
+  // Group URLs by a normalized key (strip the size segment and query params)
+  const groups = new Map<string, { url: string; priority: number }>()
+
+  for (const url of urls) {
+    // Match patterns like /product/{id}/{size}/... or /products/{size}/...
+    const sizeMatch = url.match(/\/(original|large|big|medium|small|mini|micro)\//i)
+    if (!sizeMatch) {
+      // No size variant — keep as-is
+      groups.set(url, { url, priority: 10 })
+      continue
+    }
+
+    const size = sizeMatch[1].toLowerCase()
+    const key = url.replace(/\/(original|large|big|medium|small|mini|micro)\//i, '/__SIZE__/')
+    const priority = SIZE_PRIORITY[size] ?? 1
+    const existing = groups.get(key)
+    if (!existing || priority > existing.priority) {
+      groups.set(key, { url, priority })
+    }
+  }
+
+  return [...groups.values()].map((g) => g.url)
+}
+
+/**
+ * Filter out "suggestion" / "related product" images by keeping only
+ * the dominant product ID. Works when URLs contain a numeric product ID
+ * segment (e.g. /product/69787/...). If one ID appears in >50% of URLs,
+ * only keep that ID's images.
+ */
+function filterToMainProduct(urls: string[]): string[] {
+  if (urls.length <= 3) return urls
+
+  // Extract product IDs from URL paths like /product/{id}/ or /products/{id}/
+  const idCounts = new Map<string, number>()
+  const urlIds = urls.map((url) => {
+    const match = url.match(/\/products?\/(\d{3,})\//i)
+    return match?.[1] ?? null
+  })
+
+  for (const id of urlIds) {
+    if (id) idCounts.set(id, (idCounts.get(id) ?? 0) + 1)
+  }
+
+  if (idCounts.size <= 1) return urls
+
+  // Find dominant ID (most frequent)
+  let dominantId = ''
+  let maxCount = 0
+  for (const [id, count] of idCounts) {
+    if (count > maxCount) {
+      dominantId = id
+      maxCount = count
+    }
+  }
+
+  // Only filter if dominant ID covers >50% of URLs
+  if (maxCount <= urls.length * 0.5) return urls
+
+  const filtered = urls.filter((_, i) => urlIds[i] === dominantId || urlIds[i] === null)
+  if (filtered.length > 0) return filtered
+  return urls
 }
 
 function extractRelevantHtml(html: string): string {
@@ -147,14 +253,23 @@ async function extractViaFirecrawl(url: string, color?: string): Promise<string[
 
   // Try images array first — collect all valid product images
   if (doc.images && doc.images.length > 0) {
-    const productImages = deduplicateUrls(
+    const productImages = deduplicateSizeVariants(filterToMainProduct(deduplicateUrls(
       doc.images
         .map((img) => cleanImageUrl(img.startsWith('//') ? `https:${img}` : img))
         .filter((img) => isValidImageUrl(img)),
-    )
+    )))
+    // If too many images, it's likely site-wide noise — let LLM pick the right ones
+    if (productImages.length > MAX_IMAGES_PER_PRODUCT && doc.markdown && doc.markdown.trim().length > 0) {
+      console.log(`[image-extract] ${url}: Firecrawl returned ${productImages.length} images, using LLM to filter`)
+      const trimmed = doc.markdown.length > 12_000 ? doc.markdown.slice(0, 12_000) : doc.markdown
+      const llmResult = await extractImageViaLlm(url, trimmed, 'markdown', color)
+      if (llmResult && llmResult.length > 0) return llmResult.slice(0, MAX_IMAGES_PER_PRODUCT)
+      // LLM failed — return capped Firecrawl results as fallback
+      return productImages.slice(0, MAX_IMAGES_PER_PRODUCT)
+    }
     if (productImages.length > 0) {
       console.log(`[image-extract] ${url}: Firecrawl images array (${productImages.length})`)
-      return productImages
+      return productImages.slice(0, MAX_IMAGES_PER_PRODUCT)
     }
   }
 
@@ -412,26 +527,59 @@ export function createNoImgClaudeAdapter(): EnrichmentAdapter {
           }
         }
 
-        const foundUrl = typeof parsed.product_page_url === 'string' ? parsed.product_page_url.trim() : ''
-        const confidence = typeof parsed.confidence_score === 'string' ? parsed.confidence_score : 'none'
-        const matchReason = typeof parsed.match_reason === 'string' ? parsed.match_reason : ''
+        // Support both new candidates array and legacy single-URL format
+        interface Candidate {
+          readonly product_page_url: string
+          readonly confidence_score: string
+          readonly match_reason: string
+        }
 
-        if (foundUrl && (confidence === 'high' || confidence === 'medium')) {
-          const isLive = await verifyUrl(foundUrl)
-          if (isLive) {
-            enrichedFields.source_url = foundUrl
-            enrichedFields.confidence_score = confidence
-            enrichedFields.match_reason = matchReason
-            console.log(`[noimg-claude] ${product.sku}: verified ${foundUrl} (${confidence}) — ${matchReason}`)
-          } else {
-            console.log(`[noimg-claude] ${product.sku}: URL returned non-200: ${foundUrl}`)
-            enrichedFields.confidence_score = 'none'
-            enrichedFields.match_reason = `URL returned non-200: ${foundUrl}`
+        const candidates: Candidate[] = []
+
+        if (Array.isArray(parsed.candidates)) {
+          for (const c of parsed.candidates) {
+            const url = typeof c.product_page_url === 'string' ? c.product_page_url.trim() : ''
+            const conf = typeof c.confidence_score === 'string' ? c.confidence_score : 'none'
+            const reason = typeof c.match_reason === 'string' ? c.match_reason : ''
+            if (url && (conf === 'high' || conf === 'medium')) {
+              candidates.push({ product_page_url: url, confidence_score: conf, match_reason: reason })
+            }
           }
         } else {
-          console.log(`[noimg-claude] ${product.sku}: no match (${confidence})${matchReason ? ` — ${matchReason}` : ''}`)
-          enrichedFields.confidence_score = confidence
-          if (matchReason) enrichedFields.match_reason = matchReason
+          // Legacy single-URL fallback
+          const url = typeof parsed.product_page_url === 'string' ? parsed.product_page_url.trim() : ''
+          const conf = typeof parsed.confidence_score === 'string' ? parsed.confidence_score : 'none'
+          const reason = typeof parsed.match_reason === 'string' ? parsed.match_reason : ''
+          if (url && (conf === 'high' || conf === 'medium')) {
+            candidates.push({ product_page_url: url, confidence_score: conf, match_reason: reason })
+          }
+        }
+
+        // Verify candidates in order, take the first live one
+        let matched = false
+        for (const candidate of candidates) {
+          const isLive = await verifyUrl(candidate.product_page_url)
+          if (isLive) {
+            enrichedFields.source_url = candidate.product_page_url
+            enrichedFields.confidence_score = candidate.confidence_score
+            enrichedFields.match_reason = candidate.match_reason
+            console.log(`[noimg-claude] ${product.sku}: verified ${candidate.product_page_url} (${candidate.confidence_score}) — ${candidate.match_reason}`)
+            matched = true
+            break
+          }
+          console.log(`[noimg-claude] ${product.sku}: URL returned non-200: ${candidate.product_page_url}`)
+        }
+
+        if (!matched) {
+          if (candidates.length > 0) {
+            enrichedFields.confidence_score = 'none'
+            enrichedFields.match_reason = `All ${candidates.length} candidate URLs returned non-200`
+          } else {
+            const reason = typeof parsed.match_reason === 'string' ? parsed.match_reason : ''
+            console.log(`[noimg-claude] ${product.sku}: no match${reason ? ` — ${reason}` : ''}`)
+            enrichedFields.confidence_score = 'none'
+            if (reason) enrichedFields.match_reason = reason
+          }
         }
 
         // --- Pass 2: Fetch the product page and extract og:image ---
