@@ -69,6 +69,8 @@ export interface ToolEnrichment {
   readonly originalValues: Readonly<Record<string, string>>
   readonly imageLinks?: readonly string[]
   readonly sourceUrl?: string
+  readonly confidenceScore?: string
+  readonly matchReason?: string
 }
 
 // Field diff status for color coding

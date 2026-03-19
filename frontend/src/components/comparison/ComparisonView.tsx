@@ -77,39 +77,58 @@ export function ComparisonView() {
   }
 
   const toolAvailability = getToolAvailability(enrichments)
+  const isSingleTool = availableTools.length === 1
 
   return (
     <div ref={containerRef} className="h-full overflow-y-auto">
       <div className="space-y-5 p-4 md:p-6">
         <ProductHeader product={selectedProduct} />
 
-        <section className="rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
-          <p className="text-sm text-gray-600">
-            <span className="font-medium text-gray-900">Showing:</span>{' '}
-            {renderAvailabilityList(toolAvailability.available, 'None')}
-          </p>
-          <p className="mt-1 text-sm text-gray-500">
-            <span className="font-medium text-gray-900">Missing:</span>{' '}
-            {renderAvailabilityList(toolAvailability.missing, 'None')}
-          </p>
-        </section>
+        {!isSingleTool ? (
+          <section className="rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+            <p className="text-sm text-gray-600">
+              <span className="font-medium text-gray-900">Showing:</span>{' '}
+              {renderAvailabilityList(toolAvailability.available, 'None')}
+            </p>
+            <p className="mt-1 text-sm text-gray-500">
+              <span className="font-medium text-gray-900">Missing:</span>{' '}
+              {renderAvailabilityList(toolAvailability.missing, 'None')}
+            </p>
+          </section>
+        ) : null}
 
-        <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {TOOL_NAMES.map((tool) => {
-            const enrichment = enrichments.find((entry) => entry.tool === tool)
+        <section
+          className={
+            isSingleTool
+              ? 'space-y-4'
+              : 'grid grid-cols-1 gap-4 md:grid-cols-2'
+          }
+        >
+          {isSingleTool
+            ? enrichments.map((enrichment) => (
+                <EnrichmentCard
+                  key={enrichment.tool}
+                  enrichment={enrichment}
+                  product={selectedProduct}
+                />
+              ))
+            : TOOL_NAMES.map((tool) => {
+                const enrichment = enrichments.find(
+                  (entry) => entry.tool === tool,
+                )
 
-            if (!enrichment) {
-              return <EmptyCard key={tool} tool={tool} />
-            }
+                if (!enrichment) {
+                  return <EmptyCard key={tool} tool={tool} />
+                }
 
-            return (
-              <EnrichmentCard
-                key={tool}
-                enrichment={enrichment}
-                product={selectedProduct}
-              />
-            )
-          })}
+                return (
+                  <EnrichmentCard
+                    key={tool}
+                    enrichment={enrichment}
+                    product={selectedProduct}
+                  />
+                )
+              })}
         </section>
       </div>
     </div>

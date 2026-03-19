@@ -130,6 +130,8 @@ function buildToolEnrichment(
     ? rawImageLinks.split('|').map((url) => url.trim()).filter(Boolean)
     : undefined
   const sourceUrl = row['source_url']?.trim() || undefined
+  const confidenceScore = row['confidence_score']?.trim() || undefined
+  const matchReason = row['match_reason']?.trim() || undefined
 
   return {
     sku,
@@ -144,17 +146,23 @@ function buildToolEnrichment(
     originalValues,
     imageLinks: imageLinks && imageLinks.length > 0 ? imageLinks : undefined,
     sourceUrl,
+    confidenceScore: confidenceScore && confidenceScore !== 'none' ? confidenceScore : undefined,
+    matchReason: matchReason || undefined,
   }
 }
 
 export async function loadEnrichedCSV(
   tool: ToolName,
   prefix: string = 'enriched',
+  normalizeEnrichedRow?: (raw: Record<string, string>) => Record<string, string>,
 ): Promise<ToolEnrichment[]> {
   const rows = await loadCSV(`/data/${prefix}-${tool}.csv`)
   if (rows.length === 0) return []
 
-  return rows.map((row) => buildToolEnrichment(row, tool))
+  return rows.map((row) => {
+    const normalized = normalizeEnrichedRow ? normalizeEnrichedRow(row) : row
+    return buildToolEnrichment(normalized, tool)
+  })
 }
 
 export interface LoadedData {
@@ -165,7 +173,9 @@ export interface LoadedData {
 export async function loadAllData(config: DatasetConfig): Promise<LoadedData> {
   const [productsResult, ...enrichmentResults] = await Promise.allSettled([
     loadProductCSV(config),
-    ...TOOL_NAMES.map((tool) => loadEnrichedCSV(tool, config.enrichedCsvPrefix)),
+    ...TOOL_NAMES.map((tool) =>
+      loadEnrichedCSV(tool, config.enrichedCsvPrefix, config.normalizeEnrichedRow),
+    ),
   ])
 
   const products =

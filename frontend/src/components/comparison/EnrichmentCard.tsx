@@ -86,21 +86,51 @@ export function EnrichmentCard({ enrichment, product }: EnrichmentCardProps) {
         })}
       </div>
 
-      {enrichment.sourceUrl ? (
+      {enrichment.confidenceScore || enrichment.matchReason || enrichment.sourceUrl ? (
         <div className="mt-4 space-y-2 border-t border-gray-100 pt-4">
-          <div className="flex items-start gap-3">
-            <span className="w-28 shrink-0 text-xs font-medium text-gray-500">
-              Image(s) Source Url
-            </span>
-            <a
-              href={enrichment.sourceUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="min-w-0 flex-1 truncate text-sm text-blue-600 hover:text-blue-800 hover:underline"
-            >
-              {enrichment.sourceUrl}
-            </a>
-          </div>
+          {enrichment.confidenceScore ? (
+            <div className="flex items-start gap-3">
+              <span className="w-28 shrink-0 text-xs font-medium text-gray-500">
+                Confidence
+              </span>
+              <span
+                className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                  enrichment.confidenceScore === 'high'
+                    ? 'bg-green-100 text-green-700'
+                    : enrichment.confidenceScore === 'medium'
+                      ? 'bg-yellow-100 text-yellow-700'
+                      : 'bg-gray-100 text-gray-600'
+                }`}
+              >
+                {enrichment.confidenceScore}
+              </span>
+            </div>
+          ) : null}
+          {enrichment.matchReason ? (
+            <div className="flex items-start gap-3">
+              <span className="w-28 shrink-0 text-xs font-medium text-gray-500">
+                Match Reason
+              </span>
+              <span className="min-w-0 flex-1 text-sm text-gray-700">
+                {enrichment.matchReason}
+              </span>
+            </div>
+          ) : null}
+          {enrichment.sourceUrl ? (
+            <div className="flex items-start gap-3">
+              <span className="w-28 shrink-0 text-xs font-medium text-gray-500">
+                Source URL
+              </span>
+              <a
+                href={enrichment.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="min-w-0 flex-1 truncate text-sm text-blue-600 hover:text-blue-800 hover:underline"
+              >
+                {enrichment.sourceUrl}
+              </a>
+            </div>
+          ) : null}
         </div>
       ) : null}
 

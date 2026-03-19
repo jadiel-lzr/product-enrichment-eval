@@ -177,6 +177,7 @@ function SkeletonComparison() {
 
 function AppContent() {
   const { loading, error, filteredProducts, availableTools } = useProducts()
+  const isSingleTool = availableTools.length <= 1
   const [mode, setMode] = useState<'compare' | 'analysis'>('compare')
 
   return (
@@ -195,7 +196,7 @@ function AppContent() {
                   : `${filteredProducts.length} products | ${availableTools.length} tools`}
             </p>
           </div>
-          {!loading && !error ? (
+          {!loading && !error && !isSingleTool ? (
             <AnalysisModeToggle mode={mode} onChange={setMode} />
           ) : null}
         </div>
@@ -228,7 +229,11 @@ function AppContent() {
               <ResponsiveSidebar />
 
               <main className="min-w-0 flex-1 overflow-hidden bg-gray-50">
-                {mode === 'compare' ? <ComparisonView /> : <AnalysisView />}
+                {mode === 'compare' || isSingleTool ? (
+                  <ComparisonView />
+                ) : (
+                  <AnalysisView />
+                )}
               </main>
             </>
           )}
