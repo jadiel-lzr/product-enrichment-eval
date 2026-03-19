@@ -6,6 +6,7 @@ export const BRAND_DOMAINS: Readonly<Record<string, string>> = {
   'ALBERTA FERRETTI': 'albertaferretti.com',
   'ALEXANDER MCQUEEN': 'alexandermcqueen.com',
   'ALEV': 'alevimilano.com',
+  'ALEVÉ': 'alevimilano.com',
   'ANTONINO VALENTI': 'antoninovalenti.com',
   'ARMARIUM': 'armarium.com',
   'AZ FACTORY': 'azfactory.com',
@@ -20,11 +21,14 @@ export const BRAND_DOMAINS: Readonly<Record<string, string>> = {
   'BRANDO-LUBIAM': 'brandolubiam.it',
   'BRIONI': 'brioni.com',
   'BRUNO MANETTI': 'brunomanetti.it',
+  'BURBERRY': 'burberry.com',
   'BURBURRY': 'burberry.com',
   'CB MADE IN ITALY': 'cbmadeinitaly.com',
   'CHLO': 'chloe.com',
   "CHLOE'": 'chloe.com',
+  'CHLOÉ': 'chloe.com',
   // 'COURREGES': 'courreges.com', // Blocks Anthropic's crawler
+  // 'COURRÈGES': 'courreges.com', // Blocks Anthropic's crawler
   'CUTLER AND GROSS': 'cutlerandgross.com',
   'DARKPARK': 'darkpark.co',
   'DESA': '1972desa.com',
@@ -32,6 +36,7 @@ export const BRAND_DOMAINS: Readonly<Record<string, string>> = {
   'DOLCE & GABBANA JUNIOR': 'dolcegabbana.com',
   'DSQUARED2': 'dsquared2.com',
   'ERMANNO SCERVINO': 'ermannoscervino.com',
+  'ERMANNO SCERVINO KIDS': 'ermannoscervino.com',
   'ETRO': 'etro.com',
   'FINAMORE': 'finamore.it',
   'FRAME': 'frame-store.com',
@@ -46,6 +51,7 @@ export const BRAND_DOMAINS: Readonly<Record<string, string>> = {
   'LAMBERTO LOSANI': 'lambertolosani.com',
   'MACH & MACH': 'mach-mach.com',
   'MACKAGE': 'mackage.com',
+  'MARANT': 'isabelmarant.com',
   'MAGDA BUTRYM': 'magdabutrym.com',
   'MARNI': 'marni.com',
   'MINI RODINI': 'minirodini.com',
@@ -61,6 +67,7 @@ export const BRAND_DOMAINS: Readonly<Record<string, string>> = {
   'PT01': 'pt-torino.com',
   'RABANNE': 'rabanne.com',
   'SAVE THE DUCK': 'savetheduck.com',
+  'STELLA MC CARTNEY': 'stellamccartney.com',
   'STELLA MCCARTNEY': 'stellamccartney.com',
   'TAGLIATORE': 'tagliatore.com',
   'THE ATTICO': 'the-attico.com',
@@ -129,6 +136,8 @@ export const ITALIAN_COLOR_MAP: Readonly<Record<string, string>> = {
 export const BRAND_CORRECTIONS: Readonly<Record<string, string>> = {
   BURBURRY: 'Burberry',
   BALMAN: 'Balmain',
+  MARANT: 'Isabel Marant',
+  'STELLA MC CARTNEY': 'Stella McCartney',
 }
 
 export function translateColor(color: string): string {

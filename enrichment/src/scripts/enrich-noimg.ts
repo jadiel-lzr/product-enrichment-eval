@@ -48,14 +48,31 @@ function parseLimitArg(args: readonly string[]): number | undefined {
   return value
 }
 
+function parseInputArg(args: readonly string[]): string | undefined {
+  const inputIndex = args.indexOf('--input')
+  if (inputIndex === -1) return undefined
+
+  const value = args[inputIndex + 1]
+  if (!value) {
+    console.error('--input requires a file path')
+    return undefined
+  }
+  return value
+}
+
 async function main(): Promise<void> {
   mkdirSync(checkpointsDir, { recursive: true })
   mkdirSync(reportsDir, { recursive: true })
 
   const limit = parseLimitArg(process.argv.slice(2))
   const skuFilter = parseSkuArg(process.argv.slice(2))
+  const inputOverride = parseInputArg(process.argv.slice(2))
 
-  const { products: allProducts, errors } = parseProductCSV(baseCsvPath)
+  const inputPath = inputOverride ? resolve(inputOverride) : baseCsvPath
+  const { products: allProducts, errors } = parseProductCSV(inputPath)
+  if (inputOverride) {
+    console.log(`Using custom input: ${inputPath}`)
+  }
   if (errors.length > 0) {
     console.warn(`Loaded ${allProducts.length} products with ${errors.length} parse errors`)
   }
