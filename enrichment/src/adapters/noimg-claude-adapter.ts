@@ -1,3 +1,4 @@
+import { Firecrawl } from 'firecrawl'
 import { ENRICHMENT_TARGET_FIELDS } from '../types/enriched.js'
 import { NoImgEnrichedFieldsSchema } from '../types/noimg-enriched.js'
 import { withRetry } from '../batch/retry.js'
@@ -69,71 +70,171 @@ async function verifyUrl(url: string): Promise<boolean> {
   }
 }
 
-async function extractImageFromPage(url: string): Promise<string | undefined> {
+const IMAGE_EXTRACT_MODEL = process.env.IMAGE_EXTRACT_MODEL ?? 'anthropic/claude-haiku-4-5-20251001'
+
+function isValidImageUrl(url: string): boolean {
+  if (!url || url.length < 10) return false
+  if (url.startsWith('data:')) return false
+  if (!/^(https?:)?\/\//i.test(url)) return false
+  if (/(logo|favicon|sprite|social_sharing|spinner|spin_|widget|icon)/i.test(url)) return false
+  // Must look like an image file or CDN image URL
+  if (!/\.(jpe?g|png|webp|avif|gif|svg)\b/i.test(url) && !/image/i.test(url)) return false
+  return true
+}
+
+function extractRelevantHtml(html: string): string {
+  const parts: string[] = []
+
+  // Extract <head> content (og:image, meta tags)
+  const headMatch = html.match(/<head[^>]*>([\s\S]*?)<\/head>/i)
+  if (headMatch?.[1]) parts.push(headMatch[1])
+
+  // Extract JSON-LD blocks
+  const jsonLdBlocks = html.match(/<script\s[^>]*type=["']application\/ld\+json["'][^>]*>[\s\S]*?<\/script>/gi)
+  if (jsonLdBlocks) parts.push(...jsonLdBlocks)
+
+  // Extract first few image-related tags from body as fallback
+  const imgTags = html.match(/<img\s[^>]*src=["'][^"']+["'][^>]*>/gi)
+  if (imgTags) parts.push(...imgTags.slice(0, 10))
+
+  const trimmed = parts.join('\n')
+  // Cap at ~12k chars to stay well within token limits for haiku
+  return trimmed.length > 12_000 ? trimmed.slice(0, 12_000) : trimmed
+}
+
+async function fetchHtml(url: string): Promise<string | undefined> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 15_000)
+
+  const response = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    },
+    signal: controller.signal,
+    redirect: 'follow',
+  })
+
+  clearTimeout(timeout)
+
+  if (!response.ok) {
+    console.log(`[image-extract] ${url}: HTTP ${response.status}`)
+    return undefined
+  }
+
+  return response.text()
+}
+
+async function extractViaFirecrawl(url: string): Promise<string | undefined> {
+  const apiKey = process.env.FIRECRAWL_API_KEY
+  if (!apiKey) {
+    console.log(`[image-extract] ${url}: no FIRECRAWL_API_KEY, skipping fallback`)
+    return undefined
+  }
+
+  console.log(`[image-extract] ${url}: falling back to Firecrawl`)
+  const client = new Firecrawl({ apiKey })
+  const doc = await client.scrape(url, { formats: ['markdown', 'images'] })
+
+  // Try images array first — pick first valid product image
+  if (doc.images && doc.images.length > 0) {
+    const productImage = doc.images.find((img) => isValidImageUrl(img))
+    if (productImage) {
+      const resolved = productImage.startsWith('//') ? `https:${productImage}` : productImage
+      console.log(`[image-extract] ${url}: Firecrawl images array`)
+      return resolved
+    }
+  }
+
+  // Fall back to LLM on the markdown content
+  if (doc.markdown && doc.markdown.trim().length > 0) {
+    const trimmed = doc.markdown.length > 12_000 ? doc.markdown.slice(0, 12_000) : doc.markdown
+    return extractImageViaLlm(url, trimmed, 'markdown')
+  }
+
+  console.log(`[image-extract] ${url}: Firecrawl returned no usable content`)
+  return undefined
+}
+
+async function extractImageViaLlm(
+  url: string,
+  content: string,
+  contentType: 'html' | 'markdown',
+): Promise<string | undefined> {
+  const client = createLiteLLMClient('claude')
+  const completion = await client.chat.completions.create({
+    model: IMAGE_EXTRACT_MODEL,
+    max_tokens: 256,
+    messages: [
+      {
+        role: 'user',
+        content: `Extract the primary product image URL from this product page ${contentType}.
+
+Page URL: ${url}
+
+Look for (in priority order):
+1. og:image meta tag
+2. JSON-LD structured data image field
+3. Main product image (largest/first product photo, not icons or logos)
+
+Rules:
+- Return ONLY a valid absolute image URL, nothing else
+- If the URL starts with "//" prefix it with "https:"
+- If the URL is a relative path, combine it with the page domain
+- If the image is a site logo or placeholder (not a product photo), return "none"
+- If no product image is found, return "none"
+
+${contentType === 'html' ? 'HTML' : 'Markdown'}:
+${content}`,
+      },
+    ],
+  })
+
+  const raw = completion.choices[0]?.message?.content?.trim() ?? ''
+
+  // Extract first URL from the response in case LLM was verbose
+  const urlMatch = raw.match(/https?:\/\/[^\s"'<>]+/i)
+    ?? raw.match(/^\/\/[^\s"'<>]+/i)
+  const result = urlMatch?.[0]
+
+  if (!result || !isValidImageUrl(result)) {
+    console.log(`[image-extract] ${url}: LLM found no image`)
+    return undefined
+  }
+
+  const imageUrl = result.startsWith('//') ? `https:${result}` : result
+  console.log(`[image-extract] ${url}: LLM extracted image`)
+  return imageUrl
+}
+
+export async function extractImageFromPage(url: string): Promise<string | undefined> {
   if (!url || url.trim() === '') return undefined
 
   try {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 15_000)
+    // Try direct fetch first
+    const html = await fetchHtml(url)
 
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      },
-      signal: controller.signal,
-      redirect: 'follow',
-    })
-
-    clearTimeout(timeout)
-
-    if (!response.ok) {
-      console.log(`[image-extract] ${url}: HTTP ${response.status}`)
-      return undefined
-    }
-
-    const html = await response.text()
-
-    // Try og:image first (most reliable)
-    const ogMatch = html.match(/<meta\s+(?:property|name)=["']og:image["']\s+content=["']([^"']+)["']/i)
-      ?? html.match(/<meta\s+content=["']([^"']+)["']\s+(?:property|name)=["']og:image["']/i)
-    if (ogMatch?.[1]) {
-      const imgUrl = ogMatch[1]
-      console.log(`[image-extract] ${url}: found og:image`)
-      return imgUrl.startsWith('//') ? `https:${imgUrl}` : imgUrl
-    }
-
-    // Try JSON-LD structured data
-    const jsonLdMatch = html.match(/<script\s+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)
-    if (jsonLdMatch) {
-      for (const block of jsonLdMatch) {
-        const jsonContent = block.replace(/<script[^>]*>/i, '').replace(/<\/script>/i, '')
-        try {
-          const data = JSON.parse(jsonContent)
-          const image = data.image ?? data.thumbnailUrl
-          if (typeof image === 'string' && image.length > 0) {
-            console.log(`[image-extract] ${url}: found JSON-LD image`)
-            return image.startsWith('//') ? `https:${image}` : image
-          }
-          if (Array.isArray(image) && image.length > 0) {
-            const first = typeof image[0] === 'string' ? image[0] : image[0]?.url ?? image[0]?.contentUrl
-            if (typeof first === 'string') {
-              console.log(`[image-extract] ${url}: found JSON-LD image array`)
-              return first.startsWith('//') ? `https:${first}` : first
-            }
-          }
-        } catch {
-          // Invalid JSON-LD, continue
-        }
+    if (html) {
+      const relevantHtml = extractRelevantHtml(html)
+      if (relevantHtml.trim().length > 0) {
+        const result = await extractImageViaLlm(url, relevantHtml, 'html')
+        if (result) return result
       }
     }
 
-    console.log(`[image-extract] ${url}: no image found in HTML`)
-    return undefined
+    // Fall back to Firecrawl for 403/429/empty pages
+    return await extractViaFirecrawl(url)
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error)
-    console.log(`[image-extract] ${url}: fetch failed (${msg})`)
-    return undefined
+    console.log(`[image-extract] ${url}: direct fetch failed (${msg}), trying Firecrawl`)
+
+    try {
+      return await extractViaFirecrawl(url)
+    } catch (fcError) {
+      const fcMsg = fcError instanceof Error ? fcError.message : String(fcError)
+      console.log(`[image-extract] ${url}: Firecrawl also failed (${fcMsg})`)
+      return undefined
+    }
   }
 }
 

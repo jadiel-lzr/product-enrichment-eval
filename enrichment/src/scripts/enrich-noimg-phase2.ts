@@ -1,0 +1,188 @@
+import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { loadEnvFile } from 'node:process'
+import { fileURLToPath } from 'node:url'
+import pLimit from 'p-limit'
+import { extractImageFromPage } from '../adapters/noimg-claude-adapter.js'
+import { parseProductCSV } from '../parsers/csv-reader.js'
+import { writeProductCSV } from '../parsers/csv-writer.js'
+
+const scriptDir = dirname(fileURLToPath(import.meta.url))
+const repoRoot = resolve(scriptDir, '../../../')
+const envPath = resolve(scriptDir, '../../.env')
+
+try {
+  loadEnvFile(envPath)
+} catch {
+  // .env file may not exist in CI
+}
+const dataDir = resolve(repoRoot, 'data')
+const frontendDataDir = resolve(repoRoot, 'frontend/public/data')
+const baseCsvPath = resolve(frontendDataDir, 'base-missing-images.csv')
+const checkpointPath = resolve(dataDir, 'checkpoints/checkpoint-noimg-claude.json')
+const phase2CheckpointPath = resolve(dataDir, 'checkpoints/checkpoint-noimg-phase2.json')
+const outputPath = resolve(dataDir, 'enriched-noimg-claude.csv')
+const frontendOutputPath = resolve(frontendDataDir, 'enriched-noimg-claude.csv')
+
+const CONCURRENCY = 10
+
+interface CheckpointArtifact {
+  readonly row: Record<string, unknown>
+  readonly result: {
+    readonly fields: Record<string, unknown>
+    readonly status: string
+  }
+}
+
+interface Phase1Checkpoint {
+  readonly artifacts: Record<string, CheckpointArtifact>
+}
+
+interface Phase2Progress {
+  readonly completed: Record<string, string | undefined>
+}
+
+function parseSkuArg(args: readonly string[]): string[] | undefined {
+  const skuIndex = args.indexOf('--sku')
+  if (skuIndex === -1) return undefined
+
+  const value = args[skuIndex + 1]
+  if (!value) {
+    console.error('--sku requires a comma-separated list of SKUs')
+    return undefined
+  }
+  return value.split(',').map((s) => s.trim()).filter(Boolean)
+}
+
+function parseLimitArg(args: readonly string[]): number | undefined {
+  const limitIndex = args.indexOf('--limit')
+  if (limitIndex === -1) return undefined
+
+  const value = Number(args[limitIndex + 1])
+  if (!Number.isInteger(value) || value <= 0) {
+    console.error('--limit must be a positive integer')
+    return undefined
+  }
+  return value
+}
+
+function loadPhase2Progress(): Phase2Progress {
+  if (!existsSync(phase2CheckpointPath)) {
+    return { completed: {} }
+  }
+  try {
+    const raw = readFileSync(phase2CheckpointPath, 'utf-8')
+    return JSON.parse(raw) as Phase2Progress
+  } catch {
+    return { completed: {} }
+  }
+}
+
+function savePhase2Progress(progress: Phase2Progress): void {
+  writeFileSync(phase2CheckpointPath, JSON.stringify(progress, null, 2), 'utf-8')
+}
+
+async function main(): Promise<void> {
+  if (!existsSync(checkpointPath)) {
+    console.error(`Phase 1 checkpoint not found: ${checkpointPath}`)
+    process.exit(1)
+  }
+
+  const limit = parseLimitArg(process.argv.slice(2))
+  const skuFilter = parseSkuArg(process.argv.slice(2))
+
+  // Load Phase 1 checkpoint
+  const phase1: Phase1Checkpoint = JSON.parse(readFileSync(checkpointPath, 'utf-8'))
+
+  // Load base CSV for original product order
+  const { products: allProducts } = parseProductCSV(baseCsvPath)
+
+  // Build rows from checkpoint, preserving original order
+  const rows: Record<string, Record<string, unknown>> = {}
+  for (const product of allProducts) {
+    const artifact = phase1.artifacts[product.sku]
+    if (artifact) {
+      rows[product.sku] = { ...artifact.row }
+    }
+  }
+
+  // Find products with source_url that need image extraction
+  let targetSkus = allProducts
+    .map((p) => p.sku)
+    .filter((sku) => {
+      const row = rows[sku]
+      return row?.source_url && typeof row.source_url === 'string' && row.source_url.trim() !== ''
+    })
+
+  if (skuFilter) {
+    targetSkus = targetSkus.filter((sku) => skuFilter.includes(sku))
+    console.log(`Filtering to ${targetSkus.length} products by SKU`)
+  } else if (limit) {
+    targetSkus = targetSkus.slice(0, limit)
+    console.log(`Limiting to ${targetSkus.length} products`)
+  }
+
+  // Load Phase 2 progress for resumability
+  const progress = loadPhase2Progress()
+  const alreadyDone = new Set(Object.keys(progress.completed))
+  const remaining = targetSkus.filter((sku) => !alreadyDone.has(sku))
+
+  // Apply already-completed results to rows
+  for (const [sku, imageUrl] of Object.entries(progress.completed)) {
+    const row = rows[sku]
+    if (row && imageUrl) {
+      row.image_links = imageUrl
+    }
+  }
+
+  console.log(`[phase2] ${targetSkus.length} products with source_url`)
+  console.log(`[phase2] ${alreadyDone.size} already done, ${remaining.length} remaining`)
+
+  const concurrencyLimit = pLimit(CONCURRENCY)
+  let processedCount = alreadyDone.size
+  let imagesFound = Object.values(progress.completed).filter(Boolean).length
+
+  const updatedProgress: Phase2Progress = { completed: { ...progress.completed } }
+
+  await Promise.all(
+    remaining.map((sku) =>
+      concurrencyLimit(async () => {
+        const row = rows[sku]
+        const sourceUrl = row?.source_url as string
+
+        const imageUrl = await extractImageFromPage(sourceUrl)
+
+        if (imageUrl) {
+          row.image_links = imageUrl
+          imagesFound++
+        }
+
+        const newCompleted = { ...updatedProgress.completed, [sku]: imageUrl }
+        const newProgress: Phase2Progress = { completed: newCompleted }
+        Object.assign(updatedProgress.completed, newCompleted)
+        savePhase2Progress(newProgress)
+
+        processedCount++
+        const status = imageUrl ? 'image found' : 'no image'
+        console.log(`[phase2] ${processedCount}/${targetSkus.length} ${sku} → ${status}`)
+      }),
+    ),
+  )
+
+  // Write full CSV (all 500 rows in original order)
+  const orderedRows = allProducts
+    .map((p) => rows[p.sku])
+    .filter((row): row is Record<string, unknown> => row !== undefined)
+
+  writeProductCSV(orderedRows, outputPath)
+  copyFileSync(outputPath, frontendOutputPath)
+
+  console.log(`\n[phase2] Complete: ${imagesFound} images found out of ${targetSkus.length} products with URLs`)
+  console.log(`Output: ${outputPath}`)
+  console.log(`Frontend copy: ${frontendOutputPath}`)
+}
+
+main().catch((error) => {
+  console.error('Phase 2 image extraction failed:', error)
+  process.exit(1)
+})
