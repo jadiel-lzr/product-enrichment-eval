@@ -143,22 +143,30 @@ export function EnrichmentCard({ enrichment, product, genericTitle }: Enrichment
 
       {enrichment.imageLinks && enrichment.imageLinks.length > 0 ? (
         <div className="mt-4 space-y-3 border-t border-gray-100 pt-4">
-          <span className="text-xs font-medium text-gray-500">
-            Enriched Images ({enrichment.imageLinks.length})
+          <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+            Found Images ({enrichment.imageLinks.length})
           </span>
-          <div className="grid grid-cols-2 gap-2">
+          <div
+            className={
+              enrichment.imageLinks.length === 1
+                ? 'flex justify-center'
+                : 'grid grid-cols-2 gap-3'
+            }
+          >
             {enrichment.imageLinks.map((url) => (
               <a
                 key={url}
                 href={url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="overflow-hidden rounded-lg border border-gray-200 bg-gray-50 transition hover:border-blue-300 hover:shadow-sm"
+                className={`group overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition hover:border-blue-400 hover:shadow-md ${
+                  enrichment.imageLinks!.length === 1 ? 'w-full max-w-xs' : ''
+                }`}
               >
                 <img
                   src={url}
                   alt="Enriched product"
-                  className="h-32 w-full object-contain"
+                  className="h-48 w-full object-contain p-2"
                   onError={(e) => {
                     const target = e.currentTarget
                     target.style.display = 'none'
@@ -168,7 +176,7 @@ export function EnrichmentCard({ enrichment, product, genericTitle }: Enrichment
                     }
                   }}
                 />
-                <div className="hidden h-32 w-full flex-col items-center justify-center gap-1 text-gray-400">
+                <div className="hidden h-48 w-full flex-col items-center justify-center gap-1 text-gray-400">
                   <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
                       strokeLinecap="round"
@@ -178,6 +186,9 @@ export function EnrichmentCard({ enrichment, product, genericTitle }: Enrichment
                     />
                   </svg>
                   <span className="text-xs">Failed to load</span>
+                </div>
+                <div className="border-t border-gray-100 px-3 py-1.5 text-center text-xs text-gray-400 transition group-hover:text-blue-500">
+                  Open full size
                 </div>
               </a>
             ))}
