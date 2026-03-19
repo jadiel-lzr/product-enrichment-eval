@@ -24,15 +24,6 @@ function EmptyCard({ tool }: { readonly tool: ToolName }) {
   )
 }
 
-function getToolAvailability(enrichments: readonly ToolEnrichment[]) {
-  const availableTools = new Set(enrichments.map((entry) => entry.tool))
-
-  return {
-    available: TOOL_NAMES.filter((tool) => availableTools.has(tool)),
-    missing: TOOL_NAMES.filter((tool) => !availableTools.has(tool)),
-  }
-}
-
 function renderAvailabilityList(
   tools: readonly ToolName[],
   fallback: string,
@@ -76,44 +67,47 @@ export function ComparisonView() {
     return <EmptyState variant="no-enrichment" />
   }
 
-  const toolAvailability = getToolAvailability(enrichments)
-  const isSingleTool = availableTools.length === 1
+  // Determine layout based on how many tools have data for THIS product
+  const productToolCount = enrichments.length
+  const isMultiTool = productToolCount > 1 && availableTools.length > 1
 
   return (
     <div ref={containerRef} className="h-full overflow-y-auto">
       <div className="space-y-5 p-4 md:p-6">
         <ProductHeader product={selectedProduct} />
 
-        {!isSingleTool ? (
+        {isMultiTool ? (
           <section className="rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
             <p className="text-sm text-gray-600">
               <span className="font-medium text-gray-900">Showing:</span>{' '}
-              {renderAvailabilityList(toolAvailability.available, 'None')}
+              {renderAvailabilityList(
+                enrichments.map((e) => e.tool),
+                'None',
+              )}
             </p>
-            <p className="mt-1 text-sm text-gray-500">
-              <span className="font-medium text-gray-900">Missing:</span>{' '}
-              {renderAvailabilityList(toolAvailability.missing, 'None')}
-            </p>
+            {availableTools.length > enrichments.length ? (
+              <p className="mt-1 text-sm text-gray-500">
+                <span className="font-medium text-gray-900">Missing:</span>{' '}
+                {renderAvailabilityList(
+                  TOOL_NAMES.filter(
+                    (t) => !enrichments.some((e) => e.tool === t),
+                  ),
+                  'None',
+                )}
+              </p>
+            ) : null}
           </section>
         ) : null}
 
         <section
           className={
-            isSingleTool
-              ? 'space-y-4'
-              : 'grid grid-cols-1 gap-4 md:grid-cols-2'
+            isMultiTool
+              ? 'grid grid-cols-1 gap-4 md:grid-cols-2'
+              : 'space-y-4'
           }
         >
-          {isSingleTool
-            ? enrichments.map((enrichment) => (
-                <EnrichmentCard
-                  key={enrichment.tool}
-                  enrichment={enrichment}
-                  product={selectedProduct}
-                  genericTitle
-                />
-              ))
-            : TOOL_NAMES.map((tool) => {
+          {isMultiTool
+            ? TOOL_NAMES.map((tool) => {
                 const enrichment = enrichments.find(
                   (entry) => entry.tool === tool,
                 )
@@ -129,7 +123,15 @@ export function ComparisonView() {
                     product={selectedProduct}
                   />
                 )
-              })}
+              })
+            : enrichments.map((enrichment) => (
+                <EnrichmentCard
+                  key={enrichment.tool}
+                  enrichment={enrichment}
+                  product={selectedProduct}
+                  genericTitle
+                />
+              ))}
         </section>
       </div>
     </div>
