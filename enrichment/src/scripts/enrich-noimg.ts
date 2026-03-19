@@ -18,7 +18,7 @@ const imagesDir = resolve(dataDir, 'images')
 const checkpointsDir = resolve(dataDir, 'checkpoints')
 const reportsDir = resolve(dataDir, 'reports')
 
-const CONCURRENCY = 1
+const CONCURRENCY = 10
 
 if (existsSync(envPath)) {
   loadEnvFile(envPath)
