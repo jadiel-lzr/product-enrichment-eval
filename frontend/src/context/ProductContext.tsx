@@ -85,6 +85,7 @@ export function ProductProvider({ dataset, children }: ProductProviderProps) {
   const [filters, setFiltersState] = useState<FilterState>(() => urlFilters)
   const lastUrlSelectionRef = useRef<string | null>(urlSku)
   const lastUrlFiltersRef = useRef<string>(JSON.stringify(urlFilters))
+  const skipUrlSyncRef = useRef(false)
 
   const setSelectedSku = useCallback((sku: string) => {
     setSelectedSkuState(sku)
@@ -95,12 +96,10 @@ export function ProductProvider({ dataset, children }: ProductProviderProps) {
   const setFilters = useCallback((update: FilterState | Partial<FilterState>) => {
     setFiltersState((prev) => {
       const next = { ...prev, ...update }
-      const serialized = JSON.stringify(next)
-      lastUrlFiltersRef.current = serialized
-      setUrlFilters(next)
       return next
     })
-  }, [setUrlFilters])
+    skipUrlSyncRef.current = true
+  }, [])
 
   const sortedProducts = useMemo(() => sortProducts(products), [products])
 
@@ -167,6 +166,16 @@ export function ProductProvider({ dataset, children }: ProductProviderProps) {
     setSelectedSkuState(urlSku)
   }, [urlSku])
 
+  // Sync state → URL when filters change programmatically
+  useEffect(() => {
+    if (!skipUrlSyncRef.current) return
+    skipUrlSyncRef.current = false
+    const serialized = JSON.stringify(filters)
+    lastUrlFiltersRef.current = serialized
+    setUrlFilters(filters)
+  }, [filters, setUrlFilters])
+
+  // Sync URL → state for external navigation (browser back/forward)
   useEffect(() => {
     const serializedFilters = JSON.stringify(urlFilters)
     if (serializedFilters === lastUrlFiltersRef.current) {
