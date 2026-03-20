@@ -1,5 +1,4 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { zodToJsonSchema } from 'zod-to-json-schema'
 import { EnrichedFieldsSchema, ENRICHMENT_TARGET_FIELDS } from '../types/enriched.js'
 import { buildEnrichmentPrompt } from '../prompts/enrichment-prompt.js'
 import { withRetry } from '../batch/retry.js'
@@ -15,7 +14,28 @@ import type { Product } from '../types/product.js'
 
 const DEFAULT_MODEL = 'claude-haiku-4-5-20250415'
 const MAX_TOKENS = 2048
-const ENRICHED_JSON_SCHEMA = zodToJsonSchema(EnrichedFieldsSchema) as Record<string, unknown>
+// Hand-crafted schema — zodToJsonSchema + .passthrough() produces schemas
+// Anthropic rejects ("too complex" / "additionalProperties: true not supported")
+const ENRICHED_JSON_SCHEMA: Record<string, unknown> = {
+  type: 'object',
+  properties: {
+    title: { type: 'string' },
+    description_eng: { type: 'string' },
+    season: { type: 'string' },
+    year: { type: 'string' },
+    collection: { type: 'string' },
+    gtin: { type: 'string' },
+    dimensions: { type: 'string' },
+    made_in: { type: 'string' },
+    materials: { type: 'string' },
+    weight: { type: 'string' },
+    color: { type: 'string' },
+    additional_info: { type: 'string' },
+    accuracy_score: { type: 'integer', minimum: 1, maximum: 10 },
+  },
+  required: [],
+  additionalProperties: false,
+}
 
 function buildJsonSchemaFormat(): { type: 'json_schema'; schema: Record<string, unknown> } {
   return {
@@ -133,7 +153,6 @@ function createNativeClaudeAdapter(): EnrichmentAdapter {
 function createLiteLLMClaudeAdapter(): EnrichmentAdapter {
   const client = createLiteLLMClient('claude')
   const model = process.env.CLAUDE_MODEL ?? DEFAULT_MODEL
-  const responseFormat = buildOpenAIJsonSchemaResponseFormat(ENRICHED_JSON_SCHEMA)
 
   return {
     name: 'claude',
@@ -156,7 +175,7 @@ function createLiteLLMClaudeAdapter(): EnrichmentAdapter {
                   content: buildOpenAIContentParts(promptText, images),
                 },
               ],
-              response_format: responseFormat,
+              response_format: { type: 'json_object' },
             }),
           `claude:${product.sku}`,
         )
