@@ -55,6 +55,11 @@ export const FIELD_LABELS: Record<CoreEnrichmentField, string> = {
   additional_info: 'Additional Info',
 }
 
+export interface ImageFlag {
+  readonly url: string
+  readonly reason: string
+}
+
 // Enrichment status for a single product from a single tool
 export interface ToolEnrichment {
   readonly sku: string
@@ -67,6 +72,12 @@ export interface ToolEnrichment {
   readonly totalFields: number
   readonly enrichedValues: Readonly<Record<string, string>>
   readonly originalValues: Readonly<Record<string, string>>
+  readonly imageLinks?: readonly string[]
+  readonly imageFlags?: readonly ImageFlag[]
+  readonly sourceUrl?: string
+  readonly confidenceScore?: string
+  readonly matchReason?: string
+  readonly imageConfidence?: number
 }
 
 // Field diff status for color coding
@@ -79,6 +90,10 @@ export interface FilterState {
   readonly category: string
   readonly department: string
   readonly enrichedBy: string
+  readonly confidence: string
+  readonly imageConfidence: string
+  readonly sourceUrlFound: string
+  readonly imageLinksFound: string
 }
 
 export const EMPTY_FILTERS: FilterState = {
@@ -87,4 +102,8 @@ export const EMPTY_FILTERS: FilterState = {
   category: '',
   department: '',
   enrichedBy: '',
+  confidence: '',
+  imageConfidence: '',
+  sourceUrlFound: '',
+  imageLinksFound: '',
 }

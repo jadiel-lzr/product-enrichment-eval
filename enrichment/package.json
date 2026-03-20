@@ -14,6 +14,7 @@
     "cache-images": "tsx src/scripts/cache-images.ts",
     "enrich": "tsx src/scripts/enrich.ts",
     "enrich:llm": "tsx src/scripts/enrich.ts --tool all-llm",
+    "enrich:noimg": "tsx src/scripts/enrich-noimg.ts",
     "pick-best-links": ".venv/bin/python src/lens/pick_best_links.py",
     "python:setup": "python3 -m venv .venv && .venv/bin/pip install -r requirements.txt && .venv/bin/playwright install chromium"
   },

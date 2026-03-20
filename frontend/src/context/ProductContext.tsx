@@ -11,20 +11,23 @@ import {
 import { useProductData } from '@/hooks/useProductData'
 import { useUrlParams } from '@/hooks/useUrlParams'
 import {
+  EMPTY_FILTERS,
   TOOL_NAMES,
   type FilterState,
   type Product,
   type ToolEnrichment,
   type ToolName,
 } from '@/types/enrichment'
+import type { DatasetConfig, DatasetId } from '@/types/dataset'
 
 interface ProductContextValue {
+  readonly datasetId: DatasetId
   readonly products: Product[]
   readonly enrichmentsByProduct: Map<string, ToolEnrichment[]>
   readonly selectedSku: string | null
   readonly setSelectedSku: (sku: string) => void
   readonly filters: FilterState
-  readonly setFilters: (filters: FilterState) => void
+  readonly setFilters: (update: Partial<FilterState>) => void
   readonly filteredProducts: Product[]
   readonly availableTools: ToolName[]
   readonly brands: string[]
@@ -70,18 +73,18 @@ function extractUniqueSorted(products: Product[], key: keyof Product): string[] 
 }
 
 interface ProductProviderProps {
+  readonly dataset: DatasetConfig
   readonly children: ReactNode
 }
 
-export function ProductProvider({ children }: ProductProviderProps) {
-  const { products, enrichmentsByProduct, loading, error } = useProductData()
-  const { urlSku, urlFilters, setUrlSku, setUrlFilters } = useUrlParams()
+export function ProductProvider({ dataset, children }: ProductProviderProps) {
+  const { products, enrichmentsByProduct, loading, error } = useProductData(dataset)
+  const { urlSku, setUrlSku } = useUrlParams()
   const [selectedSku, setSelectedSkuState] = useState<string | null>(
     () => urlSku,
   )
-  const [filters, setFiltersState] = useState<FilterState>(() => urlFilters)
+  const [filters, setFiltersState] = useState<FilterState>(EMPTY_FILTERS)
   const lastUrlSelectionRef = useRef<string | null>(urlSku)
-  const lastUrlFiltersRef = useRef<string>(JSON.stringify(urlFilters))
 
   const setSelectedSku = useCallback((sku: string) => {
     setSelectedSkuState(sku)
@@ -89,23 +92,22 @@ export function ProductProvider({ children }: ProductProviderProps) {
     setUrlSku(sku)
   }, [setUrlSku])
 
-  const setFilters = useCallback((newFilters: FilterState) => {
-    setFiltersState(newFilters)
-    const serialized = JSON.stringify(newFilters)
-    lastUrlFiltersRef.current = serialized
-    setUrlFilters(newFilters)
-  }, [setUrlFilters])
+  const setFilters = useCallback((update: Partial<FilterState>) => {
+    setFiltersState((prev) => ({ ...prev, ...update }))
+  }, [])
 
   const sortedProducts = useMemo(() => sortProducts(products), [products])
 
   const filteredProducts = useMemo(() => {
+    const isWithImages = dataset.id === 'with-images'
+
     return sortedProducts.filter((product) => {
       if (!matchesSearch(product, filters.search)) return false
       if (!matchesFilter(product.brand, filters.brand)) return false
       if (!matchesFilter(product.category, filters.category)) return false
       if (!matchesFilter(product.department, filters.department)) return false
 
-      if (filters.enrichedBy) {
+      if (isWithImages && filters.enrichedBy) {
         const enrichments = enrichmentsByProduct.get(product.sku)
         if (!enrichments) return false
         if (filters.enrichedBy === 'all') {
@@ -115,9 +117,40 @@ export function ProductProvider({ children }: ProductProviderProps) {
         return enrichments.some((e) => e.tool === filters.enrichedBy)
       }
 
+      if (!isWithImages && filters.confidence) {
+        const enrichments = enrichmentsByProduct.get(product.sku)
+        if (!enrichments) return false
+        return enrichments.some((e) => e.confidenceScore === filters.confidence)
+      }
+
+      if (!isWithImages && filters.imageConfidence) {
+        const enrichments = enrichmentsByProduct.get(product.sku)
+        if (!enrichments) return false
+        const score = enrichments.reduce((max, e) =>
+          typeof e.imageConfidence === 'number' ? Math.max(max, e.imageConfidence) : max, -1)
+        if (score === -1) return false
+        if (filters.imageConfidence === 'high' && score < 8) return false
+        if (filters.imageConfidence === 'medium' && (score < 5 || score > 7)) return false
+        if (filters.imageConfidence === 'low' && score > 4) return false
+      }
+
+      if (!isWithImages && filters.sourceUrlFound) {
+        const enrichments = enrichmentsByProduct.get(product.sku)
+        const hasSourceUrl = enrichments?.some((e) => e.sourceUrl) ?? false
+        if (filters.sourceUrlFound === 'yes' && !hasSourceUrl) return false
+        if (filters.sourceUrlFound === 'no' && hasSourceUrl) return false
+      }
+
+      if (!isWithImages && filters.imageLinksFound) {
+        const enrichments = enrichmentsByProduct.get(product.sku)
+        const hasImageLinks = enrichments?.some((e) => e.imageLinks && e.imageLinks.length > 0) ?? false
+        if (filters.imageLinksFound === 'yes' && !hasImageLinks) return false
+        if (filters.imageLinksFound === 'no' && hasImageLinks) return false
+      }
+
       return true
     })
-  }, [sortedProducts, filters, enrichmentsByProduct])
+  }, [sortedProducts, filters, enrichmentsByProduct, dataset.id])
 
   const availableTools = useMemo<ToolName[]>(() => {
     const toolsWithData = new Set<ToolName>()
@@ -144,6 +177,7 @@ export function ProductProvider({ children }: ProductProviderProps) {
     [products],
   )
 
+  // Sync URL → state for product selection (browser back/forward)
   useEffect(() => {
     if (urlSku === lastUrlSelectionRef.current) {
       return
@@ -153,16 +187,7 @@ export function ProductProvider({ children }: ProductProviderProps) {
     setSelectedSkuState(urlSku)
   }, [urlSku])
 
-  useEffect(() => {
-    const serializedFilters = JSON.stringify(urlFilters)
-    if (serializedFilters === lastUrlFiltersRef.current) {
-      return
-    }
-
-    lastUrlFiltersRef.current = serializedFilters
-    setFiltersState(urlFilters)
-  }, [urlFilters])
-
+  // Auto-select first product when filtered list changes
   useEffect(() => {
     if (loading) {
       return
@@ -192,6 +217,7 @@ export function ProductProvider({ children }: ProductProviderProps) {
 
   const value = useMemo<ProductContextValue>(
     () => ({
+      datasetId: dataset.id,
       products,
       enrichmentsByProduct,
       selectedSku,
@@ -207,6 +233,7 @@ export function ProductProvider({ children }: ProductProviderProps) {
       error,
     }),
     [
+      dataset.id,
       products,
       enrichmentsByProduct,
       selectedSku,

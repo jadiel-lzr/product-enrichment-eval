@@ -40,10 +40,10 @@ export function AnalysisView() {
                 Analysis Mode
               </p>
               <h1 className="mt-2 text-3xl font-semibold tracking-tight">
-                Aggregate reporting across the shared product slice
+                Enrichment Tool Comparison
               </h1>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-300">
-                Shared sidebar filters currently cover {scope.filteredProducts} of {scope.totalProducts} products. The full-dataset view remains visible so filtered experiments do not erase the stable benchmark.
+                Comparing {scope.filteredProducts} of {scope.totalProducts} products
               </p>
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-gray-200">

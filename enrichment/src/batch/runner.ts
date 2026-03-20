@@ -41,7 +41,7 @@ interface CheckpointState extends CheckpointData {
 }
 
 export const DEFAULT_CONCURRENCY: Record<string, number> = {
-  claude: 3,
+  claude: 10,
   gemini: 3,
   firecrawl: 2,
   gpt: 3,

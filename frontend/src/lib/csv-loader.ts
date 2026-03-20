@@ -8,6 +8,7 @@ import {
   type ToolEnrichment,
   type ToolName,
 } from '@/types/enrichment'
+import type { DatasetConfig } from '@/types/dataset'
 
 const JSON_COLUMNS = ['images', 'gtin', 'sizes', 'errors'] as const
 
@@ -50,13 +51,14 @@ async function loadCSV(path: string): Promise<Record<string, string>[]> {
   })
 }
 
-export async function loadProductCSV(): Promise<Product[]> {
-  const rows = await loadCSV('/data/base.csv')
+export async function loadProductCSV(config: DatasetConfig): Promise<Product[]> {
+  const rows = await loadCSV(config.baseCsvPath)
   const products: Product[] = []
 
   for (const raw of rows) {
     try {
-      const transformed = parseRow(raw)
+      const normalized = config.normalizeRow ? config.normalizeRow(raw) : raw
+      const transformed = parseRow(normalized)
       const product = ProductSchema.parse(transformed)
       products.push(product)
     } catch (error) {
@@ -123,6 +125,36 @@ function buildToolEnrichment(
     }
   }
 
+  const rawImageLinks = row['image_links']?.trim() ?? ''
+  const imageLinks = rawImageLinks
+    ? rawImageLinks.split('|').map((url) => url.trim()).filter(Boolean)
+    : undefined
+  const sourceUrl = row['source_url']?.trim() || undefined
+  const confidenceScore = row['confidence_score']?.trim() || undefined
+  const matchReason = row['match_reason']?.trim() || undefined
+
+  const rawImageConfidence = row['image_confidence']?.trim() || ''
+  const parsedConfidence = Number(rawImageConfidence)
+  const imageConfidence = Number.isFinite(parsedConfidence) ? parsedConfidence : undefined
+
+  const rawImageFlags = row['image_flags']?.trim() ?? ''
+  let imageFlags: { url: string; reason: string }[] | undefined
+  if (rawImageFlags) {
+    try {
+      const parsed = JSON.parse(rawImageFlags)
+      if (Array.isArray(parsed)) {
+        imageFlags = parsed.filter(
+          (f: unknown): f is { url: string; reason: string } =>
+            typeof f === 'object' && f !== null &&
+            typeof (f as Record<string, unknown>).url === 'string' &&
+            typeof (f as Record<string, unknown>).reason === 'string',
+        )
+      }
+    } catch {
+      // Malformed JSON — ignore
+    }
+  }
+
   return {
     sku,
     tool,
@@ -134,16 +166,27 @@ function buildToolEnrichment(
     totalFields: CORE_ENRICHMENT_FIELDS.length,
     enrichedValues,
     originalValues,
+    imageLinks: imageLinks && imageLinks.length > 0 ? imageLinks : undefined,
+    imageFlags: imageFlags && imageFlags.length > 0 ? imageFlags : undefined,
+    sourceUrl,
+    confidenceScore: confidenceScore && confidenceScore !== 'none' ? confidenceScore : undefined,
+    matchReason: matchReason || undefined,
+    imageConfidence,
   }
 }
 
 export async function loadEnrichedCSV(
   tool: ToolName,
+  prefix: string = 'enriched',
+  normalizeEnrichedRow?: (raw: Record<string, string>) => Record<string, string>,
 ): Promise<ToolEnrichment[]> {
-  const rows = await loadCSV(`/data/enriched-${tool}.csv`)
+  const rows = await loadCSV(`/data/${prefix}-${tool}.csv`)
   if (rows.length === 0) return []
 
-  return rows.map((row) => buildToolEnrichment(row, tool))
+  return rows.map((row) => {
+    const normalized = normalizeEnrichedRow ? normalizeEnrichedRow(row) : row
+    return buildToolEnrichment(normalized, tool)
+  })
 }
 
 export interface LoadedData {
@@ -151,10 +194,12 @@ export interface LoadedData {
   readonly enrichments: Map<string, ToolEnrichment[]>
 }
 
-export async function loadAllData(): Promise<LoadedData> {
+export async function loadAllData(config: DatasetConfig): Promise<LoadedData> {
   const [productsResult, ...enrichmentResults] = await Promise.allSettled([
-    loadProductCSV(),
-    ...TOOL_NAMES.map((tool) => loadEnrichedCSV(tool)),
+    loadProductCSV(config),
+    ...TOOL_NAMES.map((tool) =>
+      loadEnrichedCSV(tool, config.enrichedCsvPrefix, config.normalizeEnrichedRow),
+    ),
   ])
 
   const products =

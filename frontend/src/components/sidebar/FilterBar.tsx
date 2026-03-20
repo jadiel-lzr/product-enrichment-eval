@@ -1,15 +1,23 @@
-import { useEffect, useRef, useCallback, useState } from 'react'
+import { useEffect, useRef, useCallback, useState, useMemo } from 'react'
 import { useProducts } from '@/context/ProductContext'
-import { EMPTY_FILTERS, TOOL_DISPLAY_NAMES, type ToolName } from '@/types/enrichment'
+import { EMPTY_FILTERS, TOOL_DISPLAY_NAMES } from '@/types/enrichment'
 import { FilterDropdown } from './FilterDropdown'
 
-const ENRICHED_BY_OPTIONS = ['all', 'claude', 'firecrawl', 'gemini', 'gpt'] as const
-const ENRICHED_BY_LABELS: Record<string, string> = {
-  all: 'All Tools',
-  ...TOOL_DISPLAY_NAMES,
+const DEBOUNCE_MS = 200
+
+const URL_CONFIDENCE_OPTIONS = ['high', 'medium', 'low'] as const
+const URL_CONFIDENCE_LABELS: Record<string, string> = {
+  high: 'High',
+  medium: 'Medium',
+  low: 'Low',
 }
 
-const DEBOUNCE_MS = 200
+const IMAGE_CONFIDENCE_OPTIONS = ['high', 'medium', 'low'] as const
+const IMAGE_CONFIDENCE_LABELS: Record<string, string> = {
+  high: 'High (8-10)',
+  medium: 'Medium (5-7)',
+  low: 'Low (0-4)',
+}
 
 function SearchIcon() {
   return (
@@ -29,15 +37,25 @@ function SearchIcon() {
   )
 }
 
+const YES_NO_OPTIONS = ['yes', 'no'] as const
+const YES_NO_LABELS: Record<string, string> = {
+  yes: 'Yes',
+  no: 'No',
+}
+
 function hasActiveFilters(filters: {
   search: string
   brand: string
   category: string
   department: string
   enrichedBy: string
+  confidence: string
+  imageConfidence: string
+  sourceUrlFound: string
+  imageLinksFound: string
 }): boolean {
   return Boolean(
-    filters.search || filters.brand || filters.category || filters.department || filters.enrichedBy,
+    filters.search || filters.brand || filters.category || filters.department || filters.enrichedBy || filters.confidence || filters.imageConfidence || filters.sourceUrlFound || filters.imageLinksFound,
   )
 }
 
@@ -50,7 +68,39 @@ export function FilterBar() {
     brands,
     categories,
     departments,
+    availableTools,
+    enrichmentsByProduct,
+    datasetId,
   } = useProducts()
+
+  const isWithImages = datasetId === 'with-images'
+
+  const hasConfidenceData = useMemo(() => {
+    for (const enrichments of enrichmentsByProduct.values()) {
+      for (const e of enrichments) {
+        if (e.confidenceScore) return true
+      }
+    }
+    return false
+  }, [enrichmentsByProduct])
+
+  const hasImageConfidenceData = useMemo(() => {
+    for (const enrichments of enrichmentsByProduct.values()) {
+      for (const e of enrichments) {
+        if (typeof e.imageConfidence === 'number') return true
+      }
+    }
+    return false
+  }, [enrichmentsByProduct])
+
+  const enrichedByOptions = useMemo(() => {
+    if (!isWithImages) return []
+    return ['all', ...availableTools]
+  }, [isWithImages, availableTools])
+
+  const enrichedByLabels = useMemo<Record<string, string>>(() => {
+    return { all: 'All Tools', ...TOOL_DISPLAY_NAMES }
+  }, [])
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [searchValue, setSearchValue] = useState(filters.search)
@@ -75,30 +125,50 @@ export function FilterBar() {
         clearTimeout(debounceRef.current)
       }
       debounceRef.current = setTimeout(() => {
-        setFilters({ ...filters, search: search.trimStart() })
+        setFilters({ search: search.trimStart() })
       }, DEBOUNCE_MS)
     },
-    [filters, setFilters],
+    [setFilters],
   )
 
   const handleBrandChange = useCallback(
-    (brand: string) => setFilters({ ...filters, brand }),
-    [filters, setFilters],
+    (brand: string) => setFilters({ brand }),
+    [setFilters],
   )
 
   const handleCategoryChange = useCallback(
-    (category: string) => setFilters({ ...filters, category }),
-    [filters, setFilters],
+    (category: string) => setFilters({ category }),
+    [setFilters],
   )
 
   const handleDepartmentChange = useCallback(
-    (department: string) => setFilters({ ...filters, department }),
-    [filters, setFilters],
+    (department: string) => setFilters({ department }),
+    [setFilters],
   )
 
   const handleEnrichedByChange = useCallback(
-    (enrichedBy: string) => setFilters({ ...filters, enrichedBy }),
-    [filters, setFilters],
+    (enrichedBy: string) => setFilters({ enrichedBy }),
+    [setFilters],
+  )
+
+  const handleConfidenceChange = useCallback(
+    (confidence: string) => setFilters({ confidence }),
+    [setFilters],
+  )
+
+  const handleImageConfidenceChange = useCallback(
+    (imageConfidence: string) => setFilters({ imageConfidence }),
+    [setFilters],
+  )
+
+  const handleSourceUrlFoundChange = useCallback(
+    (sourceUrlFound: string) => setFilters({ sourceUrlFound }),
+    [setFilters],
+  )
+
+  const handleImageLinksFoundChange = useCallback(
+    (imageLinksFound: string) => setFilters({ imageLinksFound }),
+    [setFilters],
   )
 
   const handleClearFilters = useCallback(() => {
@@ -143,13 +213,51 @@ export function FilterBar() {
           options={departments}
           onChange={handleDepartmentChange}
         />
-        <FilterDropdown
-          label="Enriched By"
-          value={filters.enrichedBy}
-          options={[...ENRICHED_BY_OPTIONS]}
-          displayLabels={ENRICHED_BY_LABELS}
-          onChange={handleEnrichedByChange}
-        />
+        {enrichedByOptions.length > 0 ? (
+          <FilterDropdown
+            label="Enriched By"
+            value={filters.enrichedBy}
+            options={enrichedByOptions}
+            displayLabels={enrichedByLabels}
+            onChange={handleEnrichedByChange}
+          />
+        ) : null}
+        {hasConfidenceData ? (
+          <FilterDropdown
+            label="URL Confidence"
+            value={filters.confidence}
+            options={[...URL_CONFIDENCE_OPTIONS]}
+            displayLabels={URL_CONFIDENCE_LABELS}
+            onChange={handleConfidenceChange}
+          />
+        ) : null}
+        {hasImageConfidenceData ? (
+          <FilterDropdown
+            label="Image Confidence"
+            value={filters.imageConfidence}
+            options={[...IMAGE_CONFIDENCE_OPTIONS]}
+            displayLabels={IMAGE_CONFIDENCE_LABELS}
+            onChange={handleImageConfidenceChange}
+          />
+        ) : null}
+        {!isWithImages ? (
+          <FilterDropdown
+            label="Source URL"
+            value={filters.sourceUrlFound}
+            options={[...YES_NO_OPTIONS]}
+            displayLabels={YES_NO_LABELS}
+            onChange={handleSourceUrlFoundChange}
+          />
+        ) : null}
+        {!isWithImages ? (
+          <FilterDropdown
+            label="Image Links"
+            value={filters.imageLinksFound}
+            options={[...YES_NO_OPTIONS]}
+            displayLabels={YES_NO_LABELS}
+            onChange={handleImageLinksFoundChange}
+          />
+        ) : null}
       </div>
 
       {/* Match count and clear */}

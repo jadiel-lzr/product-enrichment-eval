@@ -1,4 +1,4 @@
-export const JSON_COLUMNS = ['gtin', 'sizes', 'errors', 'images'] as const
+export const JSON_COLUMNS = ['gtin', 'sizes', 'errors', 'images', 'image_flags'] as const
 
 export function parseJsonColumns(
   row: Record<string, string>,

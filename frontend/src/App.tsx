@@ -1,10 +1,13 @@
-import { useEffect, useState } from 'react'
-import { BrowserRouter } from 'react-router-dom'
+import { useCallback, useEffect, useState } from 'react'
+import { BrowserRouter, useSearchParams } from 'react-router-dom'
 import { ProductProvider, useProducts } from '@/context/ProductContext'
 import { AnalysisModeToggle } from '@/components/analysis/AnalysisModeToggle'
 import { AnalysisView } from '@/components/analysis/AnalysisView'
+import { NoImgAnalysisView } from '@/components/analysis/noimg/NoImgAnalysisView'
 import { ComparisonView } from '@/components/comparison/ComparisonView'
 import { ProductSidebar } from '@/components/sidebar/ProductSidebar'
+import { DatasetTabs } from '@/components/DatasetTabs'
+import { DATASET_CONFIGS, type DatasetId } from '@/types/dataset'
 
 function MenuIcon() {
   return (
@@ -174,11 +177,13 @@ function SkeletonComparison() {
 }
 
 function AppContent() {
-  const { loading, error, filteredProducts, availableTools } = useProducts()
+  const { loading, error, filteredProducts, availableTools, datasetId } = useProducts()
+  const isNoImgDataset = datasetId === 'without-images'
+  const showToggle = availableTools.length > 1 || isNoImgDataset
   const [mode, setMode] = useState<'compare' | 'analysis'>('compare')
 
   return (
-    <div className="flex h-screen flex-col">
+    <>
       <header className="flex items-center justify-between border-b border-gray-200 bg-white px-6 py-3">
         <div className="flex items-center gap-4">
           <div>
@@ -193,7 +198,7 @@ function AppContent() {
                   : `${filteredProducts.length} products | ${availableTools.length} tools`}
             </p>
           </div>
-          {!loading && !error ? (
+          {!loading && !error && showToggle ? (
             <AnalysisModeToggle mode={mode} onChange={setMode} />
           ) : null}
         </div>
@@ -226,12 +231,53 @@ function AppContent() {
               <ResponsiveSidebar />
 
               <main className="min-w-0 flex-1 overflow-hidden bg-gray-50">
-                {mode === 'compare' ? <ComparisonView /> : <AnalysisView />}
+                {mode === 'compare' ? (
+                  <ComparisonView />
+                ) : isNoImgDataset ? (
+                  <NoImgAnalysisView />
+                ) : (
+                  <AnalysisView />
+                )}
               </main>
             </>
           )}
         </div>
       )}
+    </>
+  )
+}
+
+function isValidDatasetId(value: string | null): value is DatasetId {
+  return value === 'with-images' || value === 'without-images'
+}
+
+function AppShell() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const rawDataset = searchParams.get('dataset')
+  const datasetId: DatasetId = isValidDatasetId(rawDataset) ? rawDataset : 'with-images'
+  const config = DATASET_CONFIGS[datasetId]
+
+  const handleDatasetChange = useCallback(
+    (nextDataset: DatasetId) => {
+      setSearchParams(
+        (current) => {
+          const next = new URLSearchParams()
+          next.set('dataset', nextDataset)
+          if (current.toString() === next.toString()) return current
+          return next
+        },
+        { replace: false },
+      )
+    },
+    [setSearchParams],
+  )
+
+  return (
+    <div className="flex h-screen flex-col">
+      <DatasetTabs activeDataset={datasetId} onChange={handleDatasetChange} />
+      <ProductProvider dataset={config} key={config.id}>
+        <AppContent />
+      </ProductProvider>
     </div>
   )
 }
@@ -239,9 +285,7 @@ function AppContent() {
 function App() {
   return (
     <BrowserRouter>
-      <ProductProvider>
-        <AppContent />
-      </ProductProvider>
+      <AppShell />
     </BrowserRouter>
   )
 }

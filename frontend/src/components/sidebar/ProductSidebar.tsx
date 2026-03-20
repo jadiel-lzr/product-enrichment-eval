@@ -44,7 +44,7 @@ function CollapseToggle({
 }
 
 export function ProductSidebar() {
-  const { filteredProducts, selectedSku, setSelectedSku } = useProducts()
+  const { filteredProducts, selectedSku, setSelectedSku, enrichmentsByProduct } = useProducts()
   const [collapsed, setCollapsed] = useState(false)
 
   const parentRef = useRef<HTMLDivElement>(null)
@@ -104,6 +104,11 @@ export function ProductSidebar() {
             if (!product) {
               return null
             }
+            const enrichments = enrichmentsByProduct.get(product.sku)
+            const enrichedImageCount = enrichments?.reduce(
+              (count, e) => count + (e.imageLinks?.length ?? 0),
+              0,
+            ) ?? 0
             return (
               <div
                 key={product.sku}
@@ -122,6 +127,7 @@ export function ProductSidebar() {
                   isSelected={selectedSku === product.sku}
                   onClick={() => setSelectedSku(product.sku)}
                   compact={collapsed}
+                  enrichedImageCount={enrichedImageCount}
                 />
               </div>
             )

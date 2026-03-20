@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { parseJsonColumns, JSON_COLUMNS } from '../json-columns.js'
 
 describe('JSON_COLUMNS', () => {
-  it('contains the 4 JSON column names', () => {
-    expect(JSON_COLUMNS).toEqual(['gtin', 'sizes', 'errors', 'images'])
+  it('contains the expected JSON column names', () => {
+    expect(JSON_COLUMNS).toEqual(['gtin', 'sizes', 'errors', 'images', 'image_flags'])
   })
 })
 
