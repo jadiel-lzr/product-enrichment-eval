@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { CORE_ENRICHMENT_FIELDS, FIELD_LABELS, type CoreEnrichmentField } from '@/types/enrichment'
 import type { WeightPreset } from '@/lib/analysis/types'
 
@@ -24,6 +25,8 @@ export function WeightControls({
   onManualWeightChange,
   onManualWeightClear,
 }: WeightControlsProps) {
+  const [showAdvanced, setShowAdvanced] = useState(false)
+
   return (
     <section className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -31,9 +34,9 @@ export function WeightControls({
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-gray-400">
             Weighting
           </p>
-          <h2 className="text-xl font-semibold text-gray-900">Tune what matters</h2>
+          <h2 className="text-xl font-semibold text-gray-900">Field Weights</h2>
           <p className="text-sm leading-6 text-gray-500">
-            Start from a named preset, then override individual fields. Rankings recompute live from the shared in-memory dataset.
+            Choose a preset to prioritize different aspects. Rankings update instantly.
           </p>
         </div>
 
@@ -62,45 +65,63 @@ export function WeightControls({
         </div>
       </div>
 
-      <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {CORE_ENRICHMENT_FIELDS.map((field) => {
-          const manualValue = manualWeights[field]
+      <div className="mt-5">
+        <button
+          type="button"
+          onClick={() => setShowAdvanced((prev) => !prev)}
+          className="text-sm font-medium text-gray-500 transition hover:text-gray-700"
+        >
+          <span
+            className="mr-1.5 inline-block transition-transform"
+            style={{ transform: showAdvanced ? 'rotate(90deg)' : 'rotate(0deg)' }}
+          >
+            {'\u25B8'}
+          </span>
+          {showAdvanced ? 'Hide advanced' : 'Show advanced'}
+        </button>
 
-          return (
-            <label
-              key={field}
-              className="rounded-2xl border border-gray-200 bg-gray-50 p-3"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-medium text-gray-800">{FIELD_LABELS[field]}</span>
-                <span className="text-xs text-gray-500">
-                  Live weight: {formatWeight(effectiveWeights[field])}
-                </span>
-              </div>
-              <div className="mt-3 flex items-center gap-2">
-                <input
-                  type="number"
-                  min="0"
-                  max="5"
-                  step="0.1"
-                  value={manualValue ?? ''}
-                  onChange={(event) =>
-                    onManualWeightChange(field, Number(event.target.value))
-                  }
-                  placeholder={formatWeight(effectiveWeights[field])}
-                  className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none ring-0 transition focus:border-gray-900"
-                />
-                <button
-                  type="button"
-                  onClick={() => onManualWeightClear(field)}
-                  className="rounded-xl border border-gray-300 px-3 py-2 text-xs font-medium text-gray-600 hover:border-gray-400 hover:text-gray-900"
+        {showAdvanced ? (
+          <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {CORE_ENRICHMENT_FIELDS.map((field) => {
+              const manualValue = manualWeights[field]
+
+              return (
+                <label
+                  key={field}
+                  className="rounded-2xl border border-gray-200 bg-gray-50 p-3"
                 >
-                  Reset
-                </button>
-              </div>
-            </label>
-          )
-        })}
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-medium text-gray-800">{FIELD_LABELS[field]}</span>
+                    <span className="text-xs text-gray-500">
+                      Live weight: {formatWeight(effectiveWeights[field])}
+                    </span>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2">
+                    <input
+                      type="number"
+                      min="0"
+                      max="5"
+                      step="0.1"
+                      value={manualValue ?? ''}
+                      onChange={(event) =>
+                        onManualWeightChange(field, Number(event.target.value))
+                      }
+                      placeholder={formatWeight(effectiveWeights[field])}
+                      className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none ring-0 transition focus:border-gray-900"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => onManualWeightClear(field)}
+                      className="rounded-xl border border-gray-300 px-3 py-2 text-xs font-medium text-gray-600 hover:border-gray-400 hover:text-gray-900"
+                    >
+                      Reset
+                    </button>
+                  </div>
+                </label>
+              )
+            })}
+          </div>
+        ) : null}
       </div>
     </section>
   )
