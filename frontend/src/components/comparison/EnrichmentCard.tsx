@@ -42,7 +42,8 @@ export function EnrichmentCard({ enrichment, product, genericTitle }: Enrichment
     [enrichment.enrichedValues],
   )
 
-  const hasUrlDiscovery = Boolean(enrichment.confidenceScore || enrichment.matchReason)
+  const hasImageConfidenceBadge = enrichment.imageConfidence === 'verified' || enrichment.imageConfidence === 'variant_uncertain'
+  const hasUrlDiscovery = Boolean(enrichment.confidenceScore || enrichment.matchReason || hasImageConfidenceBadge)
   const showFailedState = enrichment.status === 'failed' && !hasUrlDiscovery
 
   return (
@@ -72,7 +73,7 @@ export function EnrichmentCard({ enrichment, product, genericTitle }: Enrichment
         </div>
       ) : null}
 
-      {enrichment.confidenceScore || enrichment.matchReason || enrichment.sourceUrl ? (
+      {enrichment.confidenceScore || enrichment.matchReason || enrichment.sourceUrl || hasImageConfidenceBadge ? (
         <div className="mb-4 space-y-2 rounded-xl border border-blue-100 bg-blue-50/50 px-3 py-3">
           <span className="text-xs font-semibold uppercase tracking-wider text-blue-600">
             URL Discovery
@@ -92,6 +93,25 @@ export function EnrichmentCard({ enrichment, product, genericTitle }: Enrichment
                 }`}
               >
                 {enrichment.confidenceScore}
+              </span>
+            </div>
+          ) : null}
+          {enrichment.imageConfidence === 'verified' ? (
+            <div className="flex items-start gap-3">
+              <span className="w-28 shrink-0 text-xs font-medium text-gray-500">
+                Image Match
+              </span>
+              <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                verified
+              </span>
+            </div>
+          ) : enrichment.imageConfidence === 'variant_uncertain' ? (
+            <div className="flex items-start gap-3">
+              <span className="w-28 shrink-0 text-xs font-medium text-gray-500">
+                Image Match
+              </span>
+              <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                Multiple variants — color unknown
               </span>
             </div>
           ) : null}

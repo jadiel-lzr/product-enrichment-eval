@@ -71,6 +71,7 @@ export interface ToolEnrichment {
   readonly sourceUrl?: string
   readonly confidenceScore?: string
   readonly matchReason?: string
+  readonly imageConfidence?: 'verified' | 'variant_uncertain' | 'unverified'
 }
 
 // Field diff status for color coding

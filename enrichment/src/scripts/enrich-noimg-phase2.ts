@@ -89,6 +89,32 @@ function getProductColor(row: Record<string, unknown>): string {
   return translateColor(colorOriginal || color)
 }
 
+function detectVariantConfidence(
+  imageUrls: readonly string[],
+  color: string,
+): 'verified' | 'variant_uncertain' | 'unverified' {
+  if (imageUrls.length === 0) return 'unverified'
+
+  // Check for sequential _00N variant patterns (e.g. _001, _002 — Shopify/Kering colorway variants)
+  // _F/_R/_D/_E (Kering shot angles), _1/_2/_3 (Giglio views), _0/_1/_5 (SFCC views) are NOT variants
+  const variantPattern = /_0[0-9]{2}[._]/
+  const hasVariantUrls = imageUrls.filter((u) => variantPattern.test(u))
+  const uniqueVariantSuffixes = new Set(
+    hasVariantUrls.flatMap((u) => {
+      const matches = u.match(/_0([0-9]{2})[._]/g) ?? []
+      return matches
+    }),
+  )
+
+  // Only flag as variant_uncertain if we see at least 2 distinct _00N suffixes
+  // (i.e. _001 AND _002 exist, suggesting multiple colorways)
+  const hasMultipleVariants = uniqueVariantSuffixes.size >= 2
+
+  if (hasMultipleVariants && !color) return 'variant_uncertain'
+  if (color) return 'verified'
+  return 'unverified'
+}
+
 async function main(): Promise<void> {
   if (!existsSync(checkpointPath)) {
     console.error(`Phase 1 checkpoint not found: ${checkpointPath}`)
@@ -175,6 +201,9 @@ async function main(): Promise<void> {
           row.image_links = imageUrls.join('|')
           imagesFound++
         }
+
+        const imageConfidence = detectVariantConfidence(imageUrls, color)
+        row.image_confidence = imageConfidence
 
         const verifiedUrls = imageUrls.length > 0 ? imageUrls : undefined
         const newCompleted = { ...updatedProgress.completed, [sku]: verifiedUrls }

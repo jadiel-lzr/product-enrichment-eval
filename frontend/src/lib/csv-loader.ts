@@ -133,6 +133,14 @@ function buildToolEnrichment(
   const confidenceScore = row['confidence_score']?.trim() || undefined
   const matchReason = row['match_reason']?.trim() || undefined
 
+  const rawImageConfidence = row['image_confidence']?.trim() || undefined
+  const imageConfidence =
+    rawImageConfidence === 'verified' ||
+    rawImageConfidence === 'variant_uncertain' ||
+    rawImageConfidence === 'unverified'
+      ? (rawImageConfidence as 'verified' | 'variant_uncertain' | 'unverified')
+      : undefined
+
   return {
     sku,
     tool,
@@ -148,6 +156,7 @@ function buildToolEnrichment(
     sourceUrl,
     confidenceScore: confidenceScore && confidenceScore !== 'none' ? confidenceScore : undefined,
     matchReason: matchReason || undefined,
+    imageConfidence,
   }
 }
 
