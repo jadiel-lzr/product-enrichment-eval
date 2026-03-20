@@ -5,7 +5,9 @@ node_modules/
 dist/
 .claude/
 data/images/
+data/images-noimg/
 data/image-manifest.json
+data/noimg-image-manifest.json
 data/enriched-*.csv
 data/checkpoints/
 data/reports/
