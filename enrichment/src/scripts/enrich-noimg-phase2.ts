@@ -7,6 +7,7 @@ import {
   extractImageFromPage,
   verifyUrl,
   validateImagesWithVision,
+  computeImageConfidenceScore,
   type ImageFlag,
 } from "../adapters/noimg-claude-adapter.js";
 import { translateColor } from "../images/search-config.js";
@@ -97,6 +98,10 @@ function parseValidateOnly(args: readonly string[]): boolean {
   return args.includes("--validate-only");
 }
 
+function parseRevalidate(args: readonly string[]): boolean {
+  return args.includes("--revalidate");
+}
+
 function loadPhase2Progress(): Phase2Progress {
   if (!existsSync(phase2CheckpointPath)) {
     return { completed: {} };
@@ -124,31 +129,6 @@ function getProductColor(row: Record<string, unknown>): string {
   return translateColor(colorOriginal || color);
 }
 
-function detectVariantConfidence(
-  imageUrls: readonly string[],
-  color: string,
-): "verified" | "variant_uncertain" | "unverified" {
-  if (imageUrls.length === 0) return "unverified";
-
-  // Check for sequential _00N variant patterns (e.g. _001, _002 — Shopify/Kering colorway variants)
-  // _F/_R/_D/_E (Kering shot angles), _1/_2/_3 (Giglio views), _0/_1/_5 (SFCC views) are NOT variants
-  const variantPattern = /_0[0-9]{2}[._]/;
-  const hasVariantUrls = imageUrls.filter((u) => variantPattern.test(u));
-  const uniqueVariantSuffixes = new Set(
-    hasVariantUrls.flatMap((u) => {
-      const matches = u.match(/_0([0-9]{2})[._]/g) ?? [];
-      return matches;
-    }),
-  );
-
-  // Only flag as variant_uncertain if we see at least 2 distinct _00N suffixes
-  // (i.e. _001 AND _002 exist, suggesting multiple colorways)
-  const hasMultipleVariants = uniqueVariantSuffixes.size >= 2;
-
-  if (hasMultipleVariants && !color) return "variant_uncertain";
-  if (color) return "verified";
-  return "unverified";
-}
 
 async function main(): Promise<void> {
   if (!existsSync(checkpointPath)) {
@@ -161,6 +141,7 @@ async function main(): Promise<void> {
   const skuFilter = parseSkuArg(cliArgs);
   const skipValidation = parseSkipValidation(cliArgs);
   const validateOnly = parseValidateOnly(cliArgs);
+  const revalidate = parseRevalidate(cliArgs);
 
   // Load Phase 1 checkpoint
   const phase1: Phase1Checkpoint = JSON.parse(
@@ -240,8 +221,10 @@ async function main(): Promise<void> {
       .map(([sku]) => sku)
       .filter((sku) => !skuFilter || skuFilter.includes(sku));
 
-    // Only validate products that don't already have flags
-    const needsValidation = skusWithImages.filter((sku) => !existingFlags[sku]);
+    // Only validate products that don't already have flags (unless --revalidate)
+    const needsValidation = revalidate
+      ? skusWithImages
+      : skusWithImages.filter((sku) => !existingFlags[sku]);
 
     console.log(
       `[validate-only] ${skusWithImages.length} products with images`,
@@ -290,6 +273,10 @@ async function main(): Promise<void> {
               for (const flag of validation.flaggedUrls) {
                 console.log(`  ⚠ ${flag.url}: ${flag.reason}`);
               }
+            } else {
+              // Clear previous flags if revalidation found no issues
+              updatedFlags[sku] = undefined;
+              delete (row as Record<string, unknown>).image_flags;
             }
 
             validated++;
@@ -311,12 +298,14 @@ async function main(): Promise<void> {
       );
     }
 
-    // Recompute image_confidence for all products with images (so it's not lost)
+    // Recompute image_confidence score for all products with images
+    const latestFlags = loadPhase2Progress().imageFlags ?? {};
     for (const sku of skusWithImages) {
       const row = rows[sku];
       const imageUrls = progress.completed[sku] ?? [];
       const color = getProductColor(row);
-      row.image_confidence = detectVariantConfidence(imageUrls, color);
+      const flagCount = latestFlags[sku]?.length ?? 0;
+      row.image_confidence = computeImageConfidenceScore(Boolean(color), imageUrls.length, flagCount);
     }
 
     // Rewrite CSV with flags + image_confidence applied
@@ -416,8 +405,7 @@ async function main(): Promise<void> {
           row.image_flags = flaggedImages;
         }
 
-        const imageConfidence = detectVariantConfidence(imageUrls, color);
-        row.image_confidence = imageConfidence;
+        row.image_confidence = computeImageConfidenceScore(Boolean(color), imageUrls.length, flaggedImages.length);
 
         const verifiedUrls = imageUrls.length > 0 ? imageUrls : undefined;
         Object.assign(updatedProgress.completed, { [sku]: verifiedUrls });

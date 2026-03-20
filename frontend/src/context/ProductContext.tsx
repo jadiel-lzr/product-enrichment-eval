@@ -123,6 +123,17 @@ export function ProductProvider({ dataset, children }: ProductProviderProps) {
         return enrichments.some((e) => e.confidenceScore === filters.confidence)
       }
 
+      if (!isWithImages && filters.imageConfidence) {
+        const enrichments = enrichmentsByProduct.get(product.sku)
+        if (!enrichments) return false
+        const score = enrichments.reduce((max, e) =>
+          typeof e.imageConfidence === 'number' ? Math.max(max, e.imageConfidence) : max, -1)
+        if (score === -1) return false
+        if (filters.imageConfidence === 'high' && score < 8) return false
+        if (filters.imageConfidence === 'medium' && (score < 5 || score > 7)) return false
+        if (filters.imageConfidence === 'low' && score > 4) return false
+      }
+
       if (!isWithImages && filters.sourceUrlFound) {
         const enrichments = enrichmentsByProduct.get(product.sku)
         const hasSourceUrl = enrichments?.some((e) => e.sourceUrl) ?? false

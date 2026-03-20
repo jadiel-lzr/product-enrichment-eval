@@ -5,11 +5,18 @@ import { FilterDropdown } from './FilterDropdown'
 
 const DEBOUNCE_MS = 200
 
-const CONFIDENCE_OPTIONS = ['high', 'medium', 'low'] as const
-const CONFIDENCE_LABELS: Record<string, string> = {
+const URL_CONFIDENCE_OPTIONS = ['high', 'medium', 'low'] as const
+const URL_CONFIDENCE_LABELS: Record<string, string> = {
   high: 'High',
   medium: 'Medium',
   low: 'Low',
+}
+
+const IMAGE_CONFIDENCE_OPTIONS = ['high', 'medium', 'low'] as const
+const IMAGE_CONFIDENCE_LABELS: Record<string, string> = {
+  high: 'High (8-10)',
+  medium: 'Medium (5-7)',
+  low: 'Low (0-4)',
 }
 
 function SearchIcon() {
@@ -43,11 +50,12 @@ function hasActiveFilters(filters: {
   department: string
   enrichedBy: string
   confidence: string
+  imageConfidence: string
   sourceUrlFound: string
   imageLinksFound: string
 }): boolean {
   return Boolean(
-    filters.search || filters.brand || filters.category || filters.department || filters.enrichedBy || filters.confidence || filters.sourceUrlFound || filters.imageLinksFound,
+    filters.search || filters.brand || filters.category || filters.department || filters.enrichedBy || filters.confidence || filters.imageConfidence || filters.sourceUrlFound || filters.imageLinksFound,
   )
 }
 
@@ -71,6 +79,15 @@ export function FilterBar() {
     for (const enrichments of enrichmentsByProduct.values()) {
       for (const e of enrichments) {
         if (e.confidenceScore) return true
+      }
+    }
+    return false
+  }, [enrichmentsByProduct])
+
+  const hasImageConfidenceData = useMemo(() => {
+    for (const enrichments of enrichmentsByProduct.values()) {
+      for (const e of enrichments) {
+        if (typeof e.imageConfidence === 'number') return true
       }
     }
     return false
@@ -139,6 +156,11 @@ export function FilterBar() {
     [setFilters],
   )
 
+  const handleImageConfidenceChange = useCallback(
+    (imageConfidence: string) => setFilters({ imageConfidence }),
+    [setFilters],
+  )
+
   const handleSourceUrlFoundChange = useCallback(
     (sourceUrlFound: string) => setFilters({ sourceUrlFound }),
     [setFilters],
@@ -202,11 +224,20 @@ export function FilterBar() {
         ) : null}
         {hasConfidenceData ? (
           <FilterDropdown
-            label="Confidence"
+            label="URL Confidence"
             value={filters.confidence}
-            options={[...CONFIDENCE_OPTIONS]}
-            displayLabels={CONFIDENCE_LABELS}
+            options={[...URL_CONFIDENCE_OPTIONS]}
+            displayLabels={URL_CONFIDENCE_LABELS}
             onChange={handleConfidenceChange}
+          />
+        ) : null}
+        {hasImageConfidenceData ? (
+          <FilterDropdown
+            label="Image Confidence"
+            value={filters.imageConfidence}
+            options={[...IMAGE_CONFIDENCE_OPTIONS]}
+            displayLabels={IMAGE_CONFIDENCE_LABELS}
+            onChange={handleImageConfidenceChange}
           />
         ) : null}
         {!isWithImages ? (

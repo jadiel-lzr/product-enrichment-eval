@@ -10,7 +10,7 @@ vi.mock('openai', () => {
   return { default: MockOpenAI }
 })
 
-import { validateImagesWithVision, type ImageValidationResult } from '../noimg-claude-adapter.js'
+import { validateImagesWithVision, computeImageConfidenceScore, type ImageValidationResult } from '../noimg-claude-adapter.js'
 
 function mockVisionResponse(content: string) {
   mockOpenAICreate.mockResolvedValueOnce({
@@ -168,5 +168,35 @@ describe('validateImagesWithVision', () => {
     expect(content[2].type).toBe('text')
     expect(content[2].text).toContain('DOLCE & GABBANA')
     expect(content[2].text).toContain('3850073')
+  })
+})
+
+describe('computeImageConfidenceScore', () => {
+  it('returns 0 for no images', () => {
+    expect(computeImageConfidenceScore(true, 0, 0)).toBe(0)
+    expect(computeImageConfidenceScore(false, 0, 0)).toBe(0)
+  })
+
+  it('returns 10 for color + no flags', () => {
+    expect(computeImageConfidenceScore(true, 4, 0)).toBe(10)
+  })
+
+  it('returns 7 for no color + no flags', () => {
+    expect(computeImageConfidenceScore(false, 5, 0)).toBe(7)
+  })
+
+  it('penalizes proportionally to flag ratio', () => {
+    // 1/4 flagged with color: 10 - (0.25 * 7) = 8.25 → 8
+    expect(computeImageConfidenceScore(true, 4, 1)).toBe(8)
+    // 2/4 flagged with color: 10 - (0.5 * 7) = 6.5 → 7
+    expect(computeImageConfidenceScore(true, 4, 2)).toBe(7)
+  })
+
+  it('returns 3 for color + all flagged', () => {
+    expect(computeImageConfidenceScore(true, 4, 4)).toBe(3)
+  })
+
+  it('returns 0 for no color + all flagged', () => {
+    expect(computeImageConfidenceScore(false, 4, 4)).toBe(0)
   })
 })

@@ -133,13 +133,9 @@ function buildToolEnrichment(
   const confidenceScore = row['confidence_score']?.trim() || undefined
   const matchReason = row['match_reason']?.trim() || undefined
 
-  const rawImageConfidence = row['image_confidence']?.trim() || undefined
-  const imageConfidence =
-    rawImageConfidence === 'verified' ||
-    rawImageConfidence === 'variant_uncertain' ||
-    rawImageConfidence === 'unverified'
-      ? (rawImageConfidence as 'verified' | 'variant_uncertain' | 'unverified')
-      : undefined
+  const rawImageConfidence = row['image_confidence']?.trim() || ''
+  const parsedConfidence = Number(rawImageConfidence)
+  const imageConfidence = Number.isFinite(parsedConfidence) ? parsedConfidence : undefined
 
   const rawImageFlags = row['image_flags']?.trim() ?? ''
   let imageFlags: { url: string; reason: string }[] | undefined

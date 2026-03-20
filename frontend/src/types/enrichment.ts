@@ -77,7 +77,7 @@ export interface ToolEnrichment {
   readonly sourceUrl?: string
   readonly confidenceScore?: string
   readonly matchReason?: string
-  readonly imageConfidence?: 'verified' | 'variant_uncertain' | 'unverified'
+  readonly imageConfidence?: number
 }
 
 // Field diff status for color coding
@@ -91,6 +91,7 @@ export interface FilterState {
   readonly department: string
   readonly enrichedBy: string
   readonly confidence: string
+  readonly imageConfidence: string
   readonly sourceUrlFound: string
   readonly imageLinksFound: string
 }
@@ -102,6 +103,7 @@ export const EMPTY_FILTERS: FilterState = {
   department: '',
   enrichedBy: '',
   confidence: '',
+  imageConfidence: '',
   sourceUrlFound: '',
   imageLinksFound: '',
 }

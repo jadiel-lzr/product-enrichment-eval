@@ -98,6 +98,26 @@ export async function verifyUrl(url: string): Promise<boolean> {
 const IMAGE_EXTRACT_MODEL = process.env.IMAGE_EXTRACT_MODEL ?? 'anthropic/claude-haiku-4-5-20251001'
 const IMAGE_VALIDATE_MODEL = process.env.IMAGE_VALIDATE_MODEL ?? 'anthropic/claude-sonnet-4-6'
 
+/**
+ * Compute a 0-10 confidence score for extracted images.
+ * - Base 10 if color was specified (validated against it), base 7 if not (can't confirm variant)
+ * - Penalty proportional to flagged image ratio (all flagged = -7)
+ * - No images = 0
+ */
+export function computeImageConfidenceScore(
+  hasColor: boolean,
+  totalImages: number,
+  flaggedCount: number,
+): number {
+  if (totalImages === 0) return 0
+
+  const baseScore = hasColor ? 10 : 7
+  const flagRatio = flaggedCount / totalImages
+  const flagPenalty = flagRatio * 7
+
+  return Math.max(0, Math.round(baseScore - flagPenalty))
+}
+
 export interface ImageFlag {
   readonly url: string
   readonly reason: string
@@ -140,11 +160,19 @@ export async function validateImagesWithVision(
     .map((url, i) => `  Image ${i + 1}: ${url}`)
     .join('\n')
 
+  const colorLine = product.color
+    ? `Color: ${product.color}`
+    : 'Color: not specified (accept ALL color variants of this model as valid)'
+
+  const colorFlagRule = product.color
+    ? '- Shows the product in a clearly different color than described'
+    : '- Do NOT flag for color differences — no color was specified, all colorways are valid'
+
   const prompt = `You are validating product images for accuracy.
 
 Product: ${product.brand} ${product.name}
 Code: ${product.code}
-Color: ${product.color}
+${colorLine}
 Category: ${product.category}
 
 I'm showing you ${imageUrls.length} images extracted from a product page. For each image, determine if it is a valid product photo of the described item.
@@ -155,7 +183,7 @@ ${indexList}
 Flag an image if it:
 - Shows a completely different product (e.g., sneakers when the product is a tie)
 - Is a brand logo, promotional banner, or website UI element
-- Shows the product in a clearly different color than described
+${colorFlagRule}
 - Is a lifestyle/editorial image that doesn't clearly show the product
 
 Do NOT flag:
@@ -163,6 +191,8 @@ Do NOT flag:
 - Close-up detail shots (fabric texture, hardware, label)
 - Product on a model if it's the right product
 - Slightly different lighting or color rendering
+- Same product with accessories or attachments (e.g., clip-on lenses on sunglasses)
+- Different color variants of the same model when no color is specified
 
 Return ONLY JSON, no markdown:
 {"results": [{"index": 1, "valid": true}, {"index": 2, "valid": false, "reason": "Brand logo, not a product photo"}]}`
