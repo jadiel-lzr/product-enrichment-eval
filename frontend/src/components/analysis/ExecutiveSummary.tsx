@@ -20,7 +20,7 @@ function TrackBadge({ scoreTrack }: { readonly scoreTrack: 'confidence' | 'no-co
           : 'bg-amber-100 text-amber-700'
       }`}
     >
-      {scoreTrack === 'confidence' ? 'Confidence-backed' : 'No-confidence track'}
+      {scoreTrack === 'confidence' ? 'Has Accuracy Scores' : 'No Accuracy Scores'}
     </span>
   )
 }
@@ -71,7 +71,7 @@ function SummaryColumn({
 
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
               <div>
-                <p className="text-xs uppercase tracking-wide text-gray-400">Blended</p>
+                <p className="text-xs uppercase tracking-wide text-gray-400">Overall</p>
                 <p className="text-lg font-semibold text-gray-900">
                   {formatPercent(row.blendedScore)}
                 </p>
@@ -83,7 +83,7 @@ function SummaryColumn({
                 </p>
               </div>
               <div>
-                <p className="text-xs uppercase tracking-wide text-gray-400">Quality</p>
+                <p className="text-xs uppercase tracking-wide text-gray-400">Accuracy</p>
                 <p className="text-lg font-semibold text-gray-900">
                   {formatPercent(row.weightedQualityScore)}
                 </p>
@@ -92,8 +92,8 @@ function SummaryColumn({
 
             <p className="mt-3 text-xs leading-5 text-gray-500">
               {row.scoreTrack === 'confidence'
-                ? `Uses real confidence scores from ${row.confidenceMetrics?.sampleSize ?? 0} rows.`
-                : 'Visible in a separate no-confidence track because source data lacks usable confidence scores.'}
+                ? `Based on ${row.confidenceMetrics?.sampleSize ?? 0} products with accuracy scores`
+                : 'This tool did not provide accuracy scores'}
             </p>
           </article>
         ))}
@@ -114,10 +114,10 @@ export function ExecutiveSummary({
           Executive Summary
         </p>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight text-gray-900">
-          Which tool wins overall
+          Which Tool Wins Overall
         </h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-500">
-          The full-dataset ranking stays stable for the big-picture story, while the filtered slice shows how the current product subset shifts the outcome.
+          Full dataset shows the overall picture. Filtered slice reflects your current selection.
         </p>
       </div>
 
@@ -133,12 +133,10 @@ export function ExecutiveSummary({
               Takeaways
             </p>
             <h2 className="mt-2 text-xl font-semibold text-gray-900">
-              Read this before the detail tables
+              Key Insights
             </h2>
           </div>
-          <span className="text-xs text-gray-400">
-            Missing-confidence tools stay visible, never backfilled
-          </span>
+          {null}
         </div>
 
         <div className="mt-4 grid gap-3 md:grid-cols-3">

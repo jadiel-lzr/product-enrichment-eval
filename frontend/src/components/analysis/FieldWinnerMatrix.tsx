@@ -17,10 +17,10 @@ export function FieldWinnerMatrix({ rows }: FieldWinnerMatrixProps) {
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-gray-400">
             Field Winners
           </p>
-          <h2 className="mt-2 text-xl font-semibold text-gray-900">Matrix view</h2>
+          <h2 className="mt-2 text-xl font-semibold text-gray-900">Field-by-Field Comparison</h2>
         </div>
         <p className="max-w-md text-right text-sm text-gray-500">
-          This table favors scanability over decoration. Fields can stay unresolved when the lead is not meaningful.
+          Which tool performed best for each enrichment field
         </p>
       </div>
 
