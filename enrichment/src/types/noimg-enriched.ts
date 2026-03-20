@@ -21,6 +21,7 @@ export const NoImgEnrichedFieldsSchema = z.object({
   source_url: z.string().optional(),
   match_reason: z.string().optional(),
   image_confidence: z.enum(['verified', 'variant_uncertain', 'unverified']).optional(),
+  image_flags: z.string().optional(),
 })
 
 export type NoImgEnrichedFields = z.infer<typeof NoImgEnrichedFieldsSchema>

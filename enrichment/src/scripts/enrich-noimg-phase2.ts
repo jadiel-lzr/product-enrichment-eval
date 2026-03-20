@@ -3,7 +3,12 @@ import { dirname, resolve } from 'node:path'
 import { loadEnvFile } from 'node:process'
 import { fileURLToPath } from 'node:url'
 import pLimit from 'p-limit'
-import { extractImageFromPage, verifyUrl } from '../adapters/noimg-claude-adapter.js'
+import {
+  extractImageFromPage,
+  verifyUrl,
+  validateImagesWithVision,
+  type ImageFlag,
+} from '../adapters/noimg-claude-adapter.js'
 import { translateColor } from '../images/search-config.js'
 import { parseProductCSV } from '../parsers/csv-reader.js'
 import { writeProductCSV } from '../parsers/csv-writer.js'
@@ -41,6 +46,7 @@ interface Phase1Checkpoint {
 
 interface Phase2Progress {
   readonly completed: Record<string, string[] | undefined>
+  readonly imageFlags?: Record<string, ImageFlag[] | undefined>
 }
 
 function parseSkuArg(args: readonly string[]): string[] | undefined {
@@ -65,6 +71,10 @@ function parseLimitArg(args: readonly string[]): number | undefined {
     return undefined
   }
   return value
+}
+
+function parseSkipValidation(args: readonly string[]): boolean {
+  return args.includes('--skip-validation')
 }
 
 function loadPhase2Progress(): Phase2Progress {
@@ -121,8 +131,10 @@ async function main(): Promise<void> {
     process.exit(1)
   }
 
-  const limit = parseLimitArg(process.argv.slice(2))
-  const skuFilter = parseSkuArg(process.argv.slice(2))
+  const cliArgs = process.argv.slice(2)
+  const limit = parseLimitArg(cliArgs)
+  const skuFilter = parseSkuArg(cliArgs)
+  const skipValidation = parseSkipValidation(cliArgs)
 
   // Load Phase 1 checkpoint
   const phase1: Phase1Checkpoint = JSON.parse(readFileSync(checkpointPath, 'utf-8'))
@@ -168,14 +180,30 @@ async function main(): Promise<void> {
     }
   }
 
+  // Restore previously computed image flags
+  if (progress.imageFlags) {
+    for (const [sku, flags] of Object.entries(progress.imageFlags)) {
+      const row = rows[sku]
+      if (row && flags && flags.length > 0) {
+        row.image_flags = flags
+      }
+    }
+  }
+
   console.log(`[phase2] ${targetSkus.length} products with source_url`)
   console.log(`[phase2] ${alreadyDone.size} already done, ${remaining.length} remaining`)
+  if (skipValidation) {
+    console.log(`[phase2] --skip-validation: skipping vision-based junk image detection`)
+  }
 
   const concurrencyLimit = pLimit(CONCURRENCY)
   let processedCount = alreadyDone.size
   let imagesFound = Object.values(progress.completed).filter((v) => v && v.length > 0).length
 
-  const updatedProgress: Phase2Progress = { completed: { ...progress.completed } }
+  const updatedProgress: Phase2Progress = {
+    completed: { ...progress.completed },
+    imageFlags: { ...(progress.imageFlags ?? {}) },
+  }
 
   await Promise.all(
     remaining.map((sku) =>
@@ -197,21 +225,54 @@ async function main(): Promise<void> {
             )).filter((u): u is string => u !== null)
           : []
 
+        // Vision-based junk image validation
+        let flaggedImages: ImageFlag[] = []
+        if (!skipValidation && imageUrls.length > 0) {
+          const productInfo = {
+            brand: typeof row.brand === 'string' ? row.brand : '',
+            name: typeof row.name === 'string' ? row.name : '',
+            code: typeof row.code === 'string' ? row.code : '',
+            color,
+            category: typeof row.category === 'string' ? row.category : '',
+          }
+
+          const validation = await validateImagesWithVision(productInfo, imageUrls)
+          flaggedImages = validation.flaggedUrls
+
+          if (flaggedImages.length > 0) {
+            console.log(`[phase2] ${sku}: flagged ${flaggedImages.length}/${imageUrls.length} images as junk`)
+            for (const flag of flaggedImages) {
+              console.log(`  ⚠ ${flag.url}: ${flag.reason}`)
+            }
+          }
+        }
+
+        // Store ALL verified URLs in image_links (including flagged ones)
         if (imageUrls.length > 0) {
           row.image_links = imageUrls.join('|')
           imagesFound++
+        }
+
+        if (flaggedImages.length > 0) {
+          row.image_flags = flaggedImages
         }
 
         const imageConfidence = detectVariantConfidence(imageUrls, color)
         row.image_confidence = imageConfidence
 
         const verifiedUrls = imageUrls.length > 0 ? imageUrls : undefined
-        const newCompleted = { ...updatedProgress.completed, [sku]: verifiedUrls }
         Object.assign(updatedProgress.completed, { [sku]: verifiedUrls })
-        savePhase2Progress({ completed: newCompleted })
+        if (flaggedImages.length > 0) {
+          Object.assign(updatedProgress.imageFlags!, { [sku]: flaggedImages })
+        }
+        savePhase2Progress({
+          completed: { ...updatedProgress.completed },
+          imageFlags: { ...updatedProgress.imageFlags },
+        })
 
         processedCount++
-        const status = imageUrls ? `${imageUrls.length} images` : 'no image'
+        const flagNote = flaggedImages.length > 0 ? ` (${flaggedImages.length} flagged)` : ''
+        const status = imageUrls.length > 0 ? `${imageUrls.length} images${flagNote}` : 'no image'
         console.log(`[phase2] ${processedCount}/${targetSkus.length} ${sku} → ${status}${color ? ` (color: ${color})` : ''}`)
       }),
     ),

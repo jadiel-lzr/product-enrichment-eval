@@ -96,6 +96,128 @@ export async function verifyUrl(url: string): Promise<boolean> {
 }
 
 const IMAGE_EXTRACT_MODEL = process.env.IMAGE_EXTRACT_MODEL ?? 'anthropic/claude-haiku-4-5-20251001'
+const IMAGE_VALIDATE_MODEL = process.env.IMAGE_VALIDATE_MODEL ?? 'anthropic/claude-sonnet-4-6'
+
+export interface ImageFlag {
+  readonly url: string
+  readonly reason: string
+}
+
+export interface ImageValidationResult {
+  readonly validUrls: string[]
+  readonly flaggedUrls: ImageFlag[]
+}
+
+interface ProductInfo {
+  readonly brand: string
+  readonly name: string
+  readonly code: string
+  readonly color: string
+  readonly category: string
+}
+
+/**
+ * Sends all extracted images to a vision model alongside product metadata.
+ * The model identifies which images actually show the described product and
+ * flags unrelated ones (brand logos, promo banners, different products).
+ */
+export async function validateImagesWithVision(
+  product: ProductInfo,
+  imageUrls: readonly string[],
+): Promise<ImageValidationResult> {
+  if (imageUrls.length === 0) {
+    return { validUrls: [], flaggedUrls: [] }
+  }
+
+  const client = createLiteLLMClient('claude')
+
+  const imageContent = imageUrls.map((url) => ({
+    type: 'image_url' as const,
+    image_url: { url },
+  }))
+
+  const indexList = imageUrls
+    .map((url, i) => `  Image ${i + 1}: ${url}`)
+    .join('\n')
+
+  const prompt = `You are validating product images for accuracy.
+
+Product: ${product.brand} ${product.name}
+Code: ${product.code}
+Color: ${product.color}
+Category: ${product.category}
+
+I'm showing you ${imageUrls.length} images extracted from a product page. For each image, determine if it is a valid product photo of the described item.
+
+Image index reference:
+${indexList}
+
+Flag an image if it:
+- Shows a completely different product (e.g., sneakers when the product is a tie)
+- Is a brand logo, promotional banner, or website UI element
+- Shows the product in a clearly different color than described
+- Is a lifestyle/editorial image that doesn't clearly show the product
+
+Do NOT flag:
+- Product photos from different angles (front, back, side, detail)
+- Close-up detail shots (fabric texture, hardware, label)
+- Product on a model if it's the right product
+- Slightly different lighting or color rendering
+
+Return ONLY JSON, no markdown:
+{"results": [{"index": 1, "valid": true}, {"index": 2, "valid": false, "reason": "Brand logo, not a product photo"}]}`
+
+  try {
+    const completion = await client.chat.completions.create({
+      model: IMAGE_VALIDATE_MODEL,
+      max_tokens: 1024,
+      messages: [{
+        role: 'user',
+        content: [...imageContent, { type: 'text' as const, text: prompt }],
+      }],
+    })
+
+    const raw = completion.choices[0]?.message?.content?.trim() ?? ''
+    const parsed = tryParseJsonContent(raw)
+
+    if (!parsed || !Array.isArray(parsed.results)) {
+      console.log(`[image-validate] Failed to parse validation response, treating all as valid`)
+      return { validUrls: [...imageUrls], flaggedUrls: [] }
+    }
+
+    const validUrls: string[] = []
+    const flaggedUrls: ImageFlag[] = []
+    const seen = new Set<number>()
+
+    for (const result of parsed.results) {
+      const index = typeof result.index === 'number' ? result.index - 1 : -1
+      if (index < 0 || index >= imageUrls.length) continue
+      seen.add(index)
+
+      if (result.valid) {
+        validUrls.push(imageUrls[index])
+      } else {
+        flaggedUrls.push({
+          url: imageUrls[index],
+          reason: typeof result.reason === 'string' ? result.reason : 'Flagged as unrelated',
+        })
+      }
+    }
+
+    // Images not mentioned in response are treated as valid
+    for (let i = 0; i < imageUrls.length; i++) {
+      if (!seen.has(i)) {
+        validUrls.push(imageUrls[i])
+      }
+    }
+
+    return { validUrls, flaggedUrls }
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error)
+    console.log(`[image-validate] Vision validation failed (${msg}), treating all as valid`)
+    return { validUrls: [...imageUrls], flaggedUrls: [] }
+  }
+}
 
 function cleanImageUrl(url: string): string {
   // Strip trailing markdown/JSON artifacts LLMs sometimes append
