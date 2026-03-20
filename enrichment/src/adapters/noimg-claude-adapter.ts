@@ -108,7 +108,9 @@ function isValidImageUrl(url: string): boolean {
   if (!/^(https?:)?\/\//i.test(url)) return false
   if (/(logo|favicon|sprite|social_sharing|spinner|spin_|widget|icon)/i.test(url)) return false
   // Exclude common non-product patterns (banners, navigation, footer, editorial, store UI)
-  if (/(banner|nav[_-]|footer|editorial|blog|magazine|lookbook|placeholder|badge|payment|flag[_-]|shipping|return|need_help|express_|easy_|star_|guarantee|trust|secure_|checkout)/i.test(url)) return false
+  if (/(banner|header[_-]|nav[_-]|footer|editorial|blog|magazine|lookbook|placeholder|badge|payment|flag[_-]|shipping|return|need_help|express_|easy_|star_|guarantee|trust|secure_|checkout)/i.test(url)) return false
+  // Exclude short all-caps brand acronym filenames (e.g. DG.png, YSL.png, GG.png) — these are logos
+  if (/\/[A-Z]{2,5}\d?\.(png|jpg|jpeg|svg|gif)$/i.test(url)) return false
   // Exclude tiny Shopify thumbnails (width=200 or less) — likely navigation/icons
   if (/[?&]width=(1?\d{1,2}|200)\b/.test(url)) return false
   // Reject truncated CDN URLs (Cloudinary) that end with transform params but no actual image file
