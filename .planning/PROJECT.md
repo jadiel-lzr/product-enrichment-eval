@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A validation project that compares multiple product data enrichment tools (Claude, Gemini, FireCrawl, Perplexity, stretch candidates Apify/Zyte, and SerpAPI Google Lens for URL discovery) on ~500 real products from vendor feeds. Results are presented in a React comparison UI with filtering and scoring so the client can choose the best enrichment strategy.
+A validation project comparing multiple product data enrichment tools (Claude, Gemini, FireCrawl, Perplexity) on ~500 real luxury fashion products. A TypeScript enrichment pipeline fills missing fields, and a React dashboard lets the client compare results side-by-side with filtering, scoring, and analysis to choose the best enrichment strategy.
 
 ## Core Value
 
@@ -12,66 +12,43 @@ The client can visually compare enrichment quality across tools and make an info
 
 ### Validated
 
-(None yet — ship to validate)
+- ✓ Zod-validated CSV parsing with 498 products after cleaning — v1.0
+- ✓ Image preflight and caching (990/995 URLs reachable, 99.5%) — v1.0
+- ✓ 4 enrichment adapters (Claude, Gemini, FireCrawl, Perplexity) behind shared interface — v1.0
+- ✓ Checkpoint/resume batch runner surviving crashes without re-processing — v1.0
+- ✓ Enriched CSV output per tool with enrichment metadata — v1.0
+- ✓ React comparison UI with side-by-side cards and color-coded field diffs — v1.0
+- ✓ Product browsing with virtual scroll, filtering (brand/category/department/completeness) — v1.0
+- ✓ Analysis dashboard with weighted scoring, field winner matrix, completeness metrics — v1.0
+- ✓ CSV export for sharing analysis results — v1.0
 
 ### Active
 
-- [ ] Enrich ~500 products with each tool, filling missing fields (description, season, year, collection, gtin, dimensions)
-- [ ] Output one CSV per enrichment tool with enriched data
-- [ ] React comparison UI showing side-by-side product cards per tool
-- [ ] Filtering by brand, category, department, enrichment completeness
-- [ ] Client scoring system to rate each tool's output quality
-- [ ] Visual diff highlighting enriched vs original fields
-- [ ] Product image display from feed URLs
-- [ ] Aggregate comparison report per tool
+- [ ] SerpAPI Google Lens URL discovery for visual product search
+- [ ] URL manifest consumable by scraping adapters (FireCrawl)
+- [ ] Discovery metadata tracking (match confidence, result count)
 
 ### Out of Scope
 
-- Database integration — this is a standalone evaluation, not production pipeline
+- Database integration — standalone evaluation, not production pipeline
 - Shopify sync — no publishing, just comparison
 - Image enrichment (finding better images) — focus is on data fields
-- Production-grade error handling — prototype quality is acceptable
-- Authentication — this is an internal/demo tool
+- Authentication — internal/demo tool
+- Real-time enrichment in UI — enrichment runs as CLI batch
+- Automated accuracy scoring — requires ground truth data we don't have
 
 ## Context
 
-### Current Enrichment System (product-middleware)
-
-The existing pipeline in `product-middleware` uses a 3-phase FireCrawl strategy:
-1. Search via `/v2/search` (1 credit, ~3s) — returns markdown
-2. Parse markdown locally with `MarkdownFieldExtractor` — instant
-3. Fallback: scrape URL directly via `/v1/scrape` (1 credit)
-
-**Known limitations:**
-- Markdown parsing depends heavily on page structure — many sites have messy HTML
-- Description extraction rejects listing/category pages, so products without dedicated pages get nothing
-- GTIN/dimensions extraction only works with very specific formatting patterns
-- ~3 credits per product with inconsistent results
-- Poor quality for a significant percentage of products
-
-### Product Data
-
-Products come from vendor feeds (270+ boutiques). The CSV has 38 columns including product identifiers (sku, code, model), metadata (brand, color, category, department), pricing, images, and the `errors` column listing which fields are missing per product.
-
-### Enrichment Tools
-
-**Core 4** (API keys available):
-- Claude (Anthropic) — LLM + Vision, send product data + images
-- Gemini (Google) — LLM + Vision, same approach, different model
-- FireCrawl — Web search + markdown scraping (replicating current approach)
-- Perplexity — Search-augmented LLM
-
-**URL Discovery** (pre-enrichment):
-- SerpAPI (Google Lens) — Visual product search to find accurate product page URLs. Takes product images, returns matching product pages from across the web. These URLs feed into scraping tools (FireCrawl) for more accurate extraction. Completely independent module that can be built by a separate developer.
-
-**Stretch 2** (free tiers / trials):
-- Apify — Pre-built e-commerce scrapers ($5/mo free credits)
-- Zyte — AI-powered extraction (free trial)
+Shipped v1.0 MVP with 12,086 LOC TypeScript across 2 packages.
+Tech stack: TypeScript, React 19, Vite 8, Tailwind v4, Zod v3, Vitest, PapaParse, Sharp.
+Enrichment adapters: Anthropic SDK, Google GenAI, FireCrawl JS, OpenAI SDK (Perplexity).
+498 enrichable products from vendor feeds (270+ boutiques).
+Post-v1.0 work focused on improving enrichment quality for products missing images using web search approaches.
 
 ## Constraints
 
 - **Tech stack**: TypeScript for enrichment scripts + React/Vite for frontend — unified codebase
-- **Budget**: Use free tiers where possible; estimated ~$20-30 for core 4 tools across 500 products + SerpAPI costs for URL discovery
+- **Budget**: Use free tiers where possible; estimated ~$20-30 for core 4 tools across 500 products + SerpAPI costs
 - **Timeline**: Quick validation project — needs to be presentable to client
 - **Data**: Must use the provided `originalUnEnrichedProductFeed.csv` as the source of truth
 
@@ -79,12 +56,16 @@ Products come from vendor feeds (270+ boutiques). The CSV has 38 columns includi
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| TypeScript for everything | Same language for scripts + React frontend, unified codebase | — Pending |
-| LLM tools get images + text | Multi-modal enrichment should produce better descriptions | — Pending |
-| Scraping tools search brand sites + Google Shopping | Maximum coverage for finding product pages | — Pending |
-| SerpAPI Google Lens for URL discovery | Visual search finds actual product pages more reliably than text search; feeds accurate URLs to scrapers | — Pending |
-| One CSV per tool | Simple comparison, easy to load in React UI | — Pending |
-| LocalStorage for scoring | No backend needed for client ratings | — Pending |
+| TypeScript for everything | Same language for scripts + React frontend, unified codebase | ✓ Good |
+| LLM tools get images + text | Multi-modal enrichment produces better descriptions | ✓ Good |
+| Zod v3 (not v4) | Stable API compatibility with research patterns | ✓ Good |
+| EnrichedFieldsSchema .passthrough() | Allows hybrid LLM discovery of extra fields | ✓ Good |
+| Image resizer returns Buffer | Adapters encode per their API format (base64 vs inline) | ✓ Good |
+| Confidence vs no-confidence ranking tracks | Separates tools with accuracy scores from those without | ✓ Good |
+| One CSV per tool | Simple comparison, easy to load in React UI | ✓ Good |
+| LocalStorage for scoring | No backend needed for client ratings | ✓ Good |
+| Tailwind v4 CSS-first config | @theme directives, no tailwind.config needed | ✓ Good |
+| SerpAPI as DETACHED phase | Independent from core pipeline, can be built in parallel | — Pending |
 
 ---
-*Last updated: 2026-03-13 after initialization*
+*Last updated: 2026-03-19 after v1.0 milestone*
