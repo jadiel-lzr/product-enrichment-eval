@@ -128,14 +128,14 @@ function buildScoreBuckets(
   return buckets.map((bucket) => ({ bucket, count: counts.get(bucket) ?? 0 }))
 }
 
-const IMAGE_CONFIDENCE_BUCKETS = ['0-2', '3-4', '5-6', '7-8', '9-10'] as const
+const IMAGE_CONFIDENCE_BUCKETS = ['9-10', '7-8', '5-6', '3-4', '0-2'] as const
 const IMAGE_CONFIDENCE_RANGES: readonly [number, number][] = [
-  [0, 2], [3, 4], [5, 6], [7, 8], [9, 10],
+  [9, 10], [7, 8], [5, 6], [3, 4], [0, 2],
 ]
 
-const ACCURACY_BUCKETS = ['1-2', '3-4', '5-6', '7-8', '9-10'] as const
+const ACCURACY_BUCKETS = ['9-10', '7-8', '5-6', '3-4', '1-2'] as const
 const ACCURACY_RANGES: readonly [number, number][] = [
-  [1, 2], [3, 4], [5, 6], [7, 8], [9, 10],
+  [9, 10], [7, 8], [5, 6], [3, 4], [1, 2],
 ]
 
 // --- Hook ---
@@ -184,7 +184,6 @@ export function useNoImgAnalysis(): NoImgAnalysisStats {
       { label: 'Total Products', count: filteredCount, percent: safePercent(filteredCount, filteredCount) },
       { label: 'Source URL Found', count: withSourceUrl, percent: safePercent(withSourceUrl, filteredCount) },
       { label: 'Has Images', count: withImages, percent: safePercent(withImages, filteredCount) },
-      { label: 'Unflagged Images', count: withUnflaggedImages, percent: safePercent(withUnflaggedImages, filteredCount) },
       { label: 'Enriched', count: enrichedCount, percent: safePercent(enrichedCount, filteredCount) },
     ]
 

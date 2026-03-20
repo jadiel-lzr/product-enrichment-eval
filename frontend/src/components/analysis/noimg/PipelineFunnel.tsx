@@ -62,6 +62,11 @@ export function PipelineFunnel({ steps }: PipelineFunnelProps) {
                 {step.percent}%
               </span>
             </div>
+            {step.label === 'Enriched' ? (
+              <p className="ml-40 mt-1 text-xs text-gray-400">
+                All products with at least 1 unflagged reachable image
+              </p>
+            ) : null}
           </div>
         ))}
       </div>

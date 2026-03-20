@@ -50,7 +50,7 @@ export function ImageQualityStats({ stats, totalProducts }: ImageQualityStatsPro
         </h2>
       </div>
 
-      <div className="mb-5 grid grid-cols-2 gap-4 md:grid-cols-4">
+      <div className="mb-5 grid grid-cols-2 gap-4 md:grid-cols-5">
         <StatBox
           label="Has Images"
           count={stats.withImages}
@@ -60,6 +60,12 @@ export function ImageQualityStats({ stats, totalProducts }: ImageQualityStatsPro
           label="No Images"
           count={stats.withoutImages}
           percent={safePercent(stats.withoutImages, totalProducts)}
+        />
+        <StatBox
+          label="No Flagged"
+          count={stats.withImages - stats.withFlaggedImages}
+          percent={safePercent(stats.withImages - stats.withFlaggedImages, totalProducts)}
+          color={stats.withImages - stats.withFlaggedImages > 0 ? 'text-green-600' : undefined}
         />
         <StatBox
           label="Has Flagged"
