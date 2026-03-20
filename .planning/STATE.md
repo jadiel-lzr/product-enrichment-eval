@@ -4,8 +4,8 @@ milestone: v1.0
 milestone_name: MVP
 status: shipped
 stopped_at: v1.0 milestone archived
-last_updated: "2026-03-20T13:01:07Z"
-last_activity: 2026-03-20 -- Completed quick task 260320-dho
+last_updated: "2026-03-20T17:28:00Z"
+last_activity: 2026-03-20 -- Completed quick task 260320-jws
 progress:
   total_phases: 5
   completed_phases: 4
@@ -63,9 +63,10 @@ See PROJECT.md Key Decisions table (updated 2026-03-19 after v1.0).
 |---|-------------|------|--------|-----------|
 | 260319-nyf | Fix no-image products UI: single Claude card, correct field mapping, display confidence/source_url/match_reason, remove analysis tab | 2026-03-19 | pending | [260319-nyf](./quick/260319-nyf-fix-no-image-products-ui-single-claude-c/) |
 | 260320-dho | Script audit (8 issues), image_confidence field with variant detection, isValidImageUrl filter fixes | 2026-03-20 | 8e690ae | [260320-dho](./quick/260320-dho-script-audit-and-variant-confidence-tagg/) |
+| 260320-jws | Pipeline quality Analysis view for without-images dataset (5 stat sections + dataset-aware routing) | 2026-03-20 | 4376dca | [260320-jws](./quick/260320-jws-revamp-analysis-page-for-products-withou/) |
 
 ## Session Continuity
 
 Last session: 2026-03-20
-Stopped at: Completed quick task 260320-dho
+Stopped at: Completed quick task 260320-jws
 Resume file: None
