@@ -3,6 +3,7 @@ import { BrowserRouter, useSearchParams } from 'react-router-dom'
 import { ProductProvider, useProducts } from '@/context/ProductContext'
 import { AnalysisModeToggle } from '@/components/analysis/AnalysisModeToggle'
 import { AnalysisView } from '@/components/analysis/AnalysisView'
+import { NoImgAnalysisView } from '@/components/analysis/noimg/NoImgAnalysisView'
 import { ComparisonView } from '@/components/comparison/ComparisonView'
 import { ProductSidebar } from '@/components/sidebar/ProductSidebar'
 import { DatasetTabs } from '@/components/DatasetTabs'
@@ -176,8 +177,9 @@ function SkeletonComparison() {
 }
 
 function AppContent() {
-  const { loading, error, filteredProducts, availableTools } = useProducts()
-  const isSingleTool = availableTools.length <= 1
+  const { loading, error, filteredProducts, availableTools, datasetId } = useProducts()
+  const isNoImgDataset = datasetId === 'without-images'
+  const showToggle = availableTools.length > 1 || isNoImgDataset
   const [mode, setMode] = useState<'compare' | 'analysis'>('compare')
 
   return (
@@ -196,7 +198,7 @@ function AppContent() {
                   : `${filteredProducts.length} products | ${availableTools.length} tools`}
             </p>
           </div>
-          {!loading && !error && !isSingleTool ? (
+          {!loading && !error && showToggle ? (
             <AnalysisModeToggle mode={mode} onChange={setMode} />
           ) : null}
         </div>
@@ -229,8 +231,10 @@ function AppContent() {
               <ResponsiveSidebar />
 
               <main className="min-w-0 flex-1 overflow-hidden bg-gray-50">
-                {mode === 'compare' || isSingleTool ? (
+                {mode === 'compare' ? (
                   <ComparisonView />
+                ) : isNoImgDataset ? (
+                  <NoImgAnalysisView />
                 ) : (
                   <AnalysisView />
                 )}
