@@ -141,6 +141,24 @@ function buildToolEnrichment(
       ? (rawImageConfidence as 'verified' | 'variant_uncertain' | 'unverified')
       : undefined
 
+  const rawImageFlags = row['image_flags']?.trim() ?? ''
+  let imageFlags: { url: string; reason: string }[] | undefined
+  if (rawImageFlags) {
+    try {
+      const parsed = JSON.parse(rawImageFlags)
+      if (Array.isArray(parsed)) {
+        imageFlags = parsed.filter(
+          (f: unknown): f is { url: string; reason: string } =>
+            typeof f === 'object' && f !== null &&
+            typeof (f as Record<string, unknown>).url === 'string' &&
+            typeof (f as Record<string, unknown>).reason === 'string',
+        )
+      }
+    } catch {
+      // Malformed JSON — ignore
+    }
+  }
+
   return {
     sku,
     tool,
@@ -153,6 +171,7 @@ function buildToolEnrichment(
     enrichedValues,
     originalValues,
     imageLinks: imageLinks && imageLinks.length > 0 ? imageLinks : undefined,
+    imageFlags: imageFlags && imageFlags.length > 0 ? imageFlags : undefined,
     sourceUrl,
     confidenceScore: confidenceScore && confidenceScore !== 'none' ? confidenceScore : undefined,
     matchReason: matchReason || undefined,

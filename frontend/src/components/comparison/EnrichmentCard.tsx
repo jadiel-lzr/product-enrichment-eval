@@ -145,9 +145,19 @@ export function EnrichmentCard({ enrichment, product, genericTitle }: Enrichment
 
       {enrichment.imageLinks && enrichment.imageLinks.length > 0 ? (
         <div className="mb-4 space-y-3">
-          <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-            Found Images ({enrichment.imageLinks.length})
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+              Found Images ({enrichment.imageLinks.length})
+            </span>
+            {enrichment.imageFlags && enrichment.imageFlags.length > 0 ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+                {enrichment.imageFlags.length} flagged
+              </span>
+            ) : null}
+          </div>
           <div
             className={
               enrichment.imageLinks.length === 1
@@ -155,45 +165,67 @@ export function EnrichmentCard({ enrichment, product, genericTitle }: Enrichment
                 : 'grid grid-cols-2 gap-3'
             }
           >
-            {enrichment.imageLinks.map((url) => (
-              <a
-                key={url}
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`group overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition hover:border-blue-400 hover:shadow-md ${
-                  enrichment.imageLinks!.length === 1 ? 'w-full max-w-xs' : ''
-                }`}
-              >
-                <img
-                  src={url}
-                  alt="Enriched product"
-                  className="h-48 w-full object-contain p-2"
-                  onError={(e) => {
-                    const target = e.currentTarget
-                    target.style.display = 'none'
-                    const fallback = target.nextElementSibling
-                    if (fallback instanceof HTMLElement) {
-                      fallback.style.display = 'flex'
-                    }
-                  }}
-                />
-                <div className="hidden h-48 w-full flex-col items-center justify-center gap-1 text-gray-400">
-                  <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
-                    />
-                  </svg>
-                  <span className="text-xs">Failed to load</span>
-                </div>
-                <div className="border-t border-gray-100 px-3 py-1.5 text-center text-xs text-gray-400 transition group-hover:text-blue-500">
-                  Open full size
-                </div>
-              </a>
-            ))}
+            {enrichment.imageLinks.map((url, index) => {
+              const flag = enrichment.imageFlags?.find((f) => f.url === url)
+              const isFlagged = Boolean(flag)
+
+              return (
+                <a
+                  key={url}
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`group relative overflow-hidden rounded-xl border shadow-sm transition hover:shadow-md ${
+                    isFlagged
+                      ? 'border-amber-300 bg-amber-50 hover:border-amber-400'
+                      : 'border-gray-200 bg-white hover:border-blue-400'
+                  } ${enrichment.imageLinks!.length === 1 ? 'w-full max-w-xs' : ''}`}
+                >
+                  <div className="absolute top-2 left-2 z-10 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-medium text-white">
+                    {index + 1} of {enrichment.imageLinks!.length}
+                  </div>
+                  {isFlagged ? (
+                    <div
+                      className="absolute top-2 right-2 z-10 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-medium text-white"
+                      title={flag!.reason}
+                    >
+                      Flagged
+                    </div>
+                  ) : null}
+                  <img
+                    src={url}
+                    alt={`Product image ${index + 1}`}
+                    className={`h-48 w-full object-contain p-2 ${isFlagged ? 'opacity-50' : ''}`}
+                    onError={(e) => {
+                      const target = e.currentTarget
+                      target.style.display = 'none'
+                      const fallback = target.nextElementSibling
+                      if (fallback instanceof HTMLElement) {
+                        fallback.style.display = 'flex'
+                      }
+                    }}
+                  />
+                  <div className="hidden h-48 w-full flex-col items-center justify-center gap-1 text-gray-400">
+                    <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.5}
+                        d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
+                      />
+                    </svg>
+                    <span className="text-xs">Failed to load</span>
+                  </div>
+                  <div className={`border-t px-3 py-1.5 text-center text-xs transition ${
+                    isFlagged
+                      ? 'border-amber-200 text-amber-600'
+                      : 'border-gray-100 text-gray-400 group-hover:text-blue-500'
+                  }`}>
+                    {isFlagged ? flag!.reason : 'Open full size'}
+                  </div>
+                </a>
+              )
+            })}
           </div>
         </div>
       ) : null}

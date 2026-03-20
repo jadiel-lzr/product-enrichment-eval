@@ -55,6 +55,11 @@ export const FIELD_LABELS: Record<CoreEnrichmentField, string> = {
   additional_info: 'Additional Info',
 }
 
+export interface ImageFlag {
+  readonly url: string
+  readonly reason: string
+}
+
 // Enrichment status for a single product from a single tool
 export interface ToolEnrichment {
   readonly sku: string
@@ -68,6 +73,7 @@ export interface ToolEnrichment {
   readonly enrichedValues: Readonly<Record<string, string>>
   readonly originalValues: Readonly<Record<string, string>>
   readonly imageLinks?: readonly string[]
+  readonly imageFlags?: readonly ImageFlag[]
   readonly sourceUrl?: string
   readonly confidenceScore?: string
   readonly matchReason?: string
